@@ -11,7 +11,7 @@ class GitHistoryRewriter {
   constructor(repoPath) {
     this.repoPath = repoPath;
     this.originalBranch = null;
-    this.GIT_TIMEOUT = 60000; // 60 second timeout for git operations
+    this.GIT_TIMEOUT = 300000; // 300 second timeout for git operations
   }
 
   /**
@@ -95,6 +95,14 @@ class GitHistoryRewriter {
 
         logger.info(`Processing ${Object.keys(hashDateMap).length} commits for date changes...`);
 
+        // Check for unstaged changes and handle them
+        const statusResult = this.executeGitCommand(['status', '--porcelain']);
+        if (statusResult.stdout.trim()) {
+          // If there are unstaged changes, stash them temporarily
+          logger.warn('Unstaged changes detected, stashing temporarily for filter-branch operation');
+          this.executeGitCommand(['stash', 'push', '-m', 'GCTM temporary stash for redate']);
+        }
+
         // Execute git filter-branch to rewrite all commits at once
         const filterResult = this.executeGitCommand([
           'filter-branch',
@@ -104,6 +112,16 @@ class GitHistoryRewriter {
           '--',
           '--all'
         ]);
+
+        // Restore stashed changes if they existed
+        if (statusResult.stdout.trim()) {
+          try {
+            this.executeGitCommand(['stash', 'pop']);
+            logger.info('Restored stashed changes');
+          } catch (stashError) {
+            logger.warn(`Could not restore stashed changes: ${stashError.message}`);
+          }
+        }
 
         if (filterResult.status !== 0) {
           throw new Error(`Git filter-branch failed: ${filterResult.stderr}`);
