@@ -1,12 +1,13 @@
 # gctm - Git Commit Time Machine
 
-🚀 **Git Commit Time Machine v1.1.1** - Comprehensive Git history manipulation tool with AI-powered commit message generation. Change commit dates, edit content, manage sensitive data, and generate creative commit messages using OpenAI, Anthropic, Google Gemini, and Local AI models.
+🚀 **Git Commit Time Machine v1.1.5** - Comprehensive Git history manipulation tool with AI-powered commit message generation. Change commit dates, edit content, manage sensitive data, and generate creative commit messages using OpenAI, Anthropic, Google Gemini, and Local AI models.
 
-**🎯 Version 1.1.1 Highlights:**
-- ✅ **100% Test Success Rate**: 52 comprehensive tests passing
-- 📊 **Enhanced Test Coverage**: 32.19% coverage with core modules fully tested
-- 🔧 **Bug Fixes**: Windows path validation, ESLint warnings resolved
-- 🛡️ **Quality Assurance**: Robust test suite with mocked dependencies
+**🎯 Version 1.1.5 Highlights:**
+- ✅ **Critical Git History Bug Fix**: Resolved major issue where date rewriting only affected 1 commit instead of all commits
+- 🔄 **Advanced Batch Processing**: Implemented git filter-branch for efficient bulk date changes across entire repository
+- ⚡ **Performance Enhancement**: Replaced sequential amend operations with batch processing for improved reliability
+- 🛡️ **Git Repository Safety**: Enhanced backup and restore mechanisms with automatic fallback protection
+- ✅ **100% Test Success Rate**: 421 comprehensive tests passing with improved reliability
 
 ## ✨ Features
 
@@ -371,7 +372,7 @@ A: Backups are stored in the `.gctm-backups` folder in the project directory.
 
 ## Version & License
 
-- **Version**: 1.1.1
+- **Version**: 1.1.5
 - **License**: MIT License
 - **Author**: ERSIN KOC
 - **Repository**: https://github.com/ersinkoc/git-commit-time-machine

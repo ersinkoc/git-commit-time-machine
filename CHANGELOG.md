@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5] - 2025-11-12
+
+### 🚨 CRITICAL BUG FIXES
+- **Major Git History Bug**: Resolved critical issue where date rewriting operations only affected 1 commit instead of processing all commits
+- **Sequential Processing Failure**: Fixed git amend operations that were invalidating subsequent commit references
+- **Batch Processing Implementation**: Replaced flawed sequential approach with efficient git filter-branch processing
+
+### ⚡ Performance & Reliability
+- **Git Filter-Branch Integration**: Implemented robust batch processing for bulk date changes across entire repository
+- **Enhanced Backup Safety**: Improved automatic backup creation and restore mechanisms with fallback protection
+- **Shell Script Optimization**: Created efficient case-based filtering for commit date mapping
+- **Timeout Handling**: Better handling of large repository operations with improved error recovery
+
+### 🛡️ Security & Safety
+- **Command Injection Prevention**: Enhanced shell script escaping for git filter-branch operations
+- **Backup Validation**: Improved backup branch validation and cleanup processes
+- **Error Recovery**: Better error handling with automatic restore from backup on failures
+
+### 🔧 Technical Improvements
+- **GitHistoryRewriter Refactor**: Complete rewrite of date change logic from sequential to batch processing
+- **Environment Variable Handling**: Proper GIT_AUTHOR_DATE and GIT_COMMITTER_DATE management
+- **Filter Script Generation**: Dynamic shell script generation for commit hash to date mapping
+- **Performance Monitoring**: Enhanced logging and progress tracking for large operations
+
+### 📊 Impact
+- **Functionality**: Fixed core feature that was only working for single commits
+- **Performance**: Dramatically improved processing speed for multi-commit operations
+- **Reliability**: Eliminated race conditions and hash invalidation issues
+- **User Experience**: Restored confidence in date rewriting functionality
+
 ## [1.1.1] - 2025-11-10
 
 ### Fixed 🔧
