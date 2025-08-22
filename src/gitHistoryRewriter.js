@@ -65,7 +65,7 @@ class GitHistoryRewriter {
   }
 
   /**
-   * Change commit dates using interactive rebase
+   * Change commit dates using git filter-branch for batch processing
    * @param {Array} commitsWithNewDates - Array of {hash, newDate} objects
    * @returns {Promise<Object>} Operation result
    */
@@ -82,20 +82,34 @@ class GitHistoryRewriter {
         // Get current state
         this.originalBranch = await this.getCurrentBranch();
 
-        // Process commits from oldest to newest (create copy to avoid mutating input)
-        const sortedCommits = [...commitsWithNewDates].reverse(); // Reverse copy to process oldest first
-
-        let processedCount = 0;
-
-        for (const commitData of sortedCommits) {
-          try {
-            await this.rewriteSingleCommitDate(commitData);
-            processedCount++;
-          } catch (error) {
-            logger.warn(`Failed to rewrite commit ${commitData.hash}: ${error.message}`);
+        // Create hash to date mapping for filter
+        const hashDateMap = {};
+        for (const commitData of commitsWithNewDates) {
+          if (this.isValidHash(commitData.hash)) {
+            hashDateMap[commitData.hash] = commitData.newDate;
           }
         }
 
+        // Build the filter script that will be executed for each commit
+        const envFilter = this.buildDateFilterScript(hashDateMap);
+
+        logger.info(`Processing ${Object.keys(hashDateMap).length} commits for date changes...`);
+
+        // Execute git filter-branch to rewrite all commits at once
+        const filterResult = this.executeGitCommand([
+          'filter-branch',
+          '--env-filter',
+          envFilter,
+          '--force',
+          '--',
+          '--all'
+        ]);
+
+        if (filterResult.status !== 0) {
+          throw new Error(`Git filter-branch failed: ${filterResult.stderr}`);
+        }
+
+        const processedCount = Object.keys(hashDateMap).length;
         logger.success(`Successfully changed dates for ${processedCount} commits`);
 
         // BUG-018 fix: Clean up backup branch after successful operation
@@ -115,6 +129,30 @@ class GitHistoryRewriter {
       logger.error(`Failed to rewrite Git history: ${error.message}`);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Build the date filter script for git filter-branch
+   * @param {Object} hashDateMap - Mapping of commit hash to new date
+   * @returns {string} Shell script for env filter
+   */
+  buildDateFilterScript(hashDateMap) {
+    // Convert mapping to shell case statement
+    const caseEntries = Object.entries(hashDateMap).map(([hash, date]) => {
+      // Escape shell variables and ensure proper quoting
+      const escapedDate = date.replace(/'/g, "'\"'\"'");
+      return `  "${hash}") export GIT_AUTHOR_DATE='${escapedDate}'; export GIT_COMMITTER_DATE='${escapedDate}'; ;;`;
+    });
+
+    return `
+# Date filter for Git filter-branch
+# Match commit hashes and set corresponding dates
+case "$GIT_COMMIT" in
+${caseEntries.join('\n')}
+  *) # Default: keep original dates
+     ;;
+esac
+`;
   }
 
   /**
