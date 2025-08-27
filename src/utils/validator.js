@@ -347,7 +347,7 @@ class Validator {
       errors.push('Maximum age must be a positive number');
     }
 
-    if (options.keepCount && !this.isPositiveNumber(options.keepCount)) {
+    if (options.keepCount !== undefined && !this.isPositiveNumber(options.keepCount)) {
       errors.push('Number of backups to keep must be a positive number');
     }
 
