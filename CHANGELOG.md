@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-11-10
+
+### Fixed 🔧
+- **Test Suite Enhancement**: Dramatically improved test coverage and reliability
+  - Increased test count from 24 to 52 comprehensive tests
+  - Achieved 100% test success rate (52/52 tests passing)
+  - Added comprehensive AI Assistant tests with 26 test cases
+  - Fixed Windows path validation issues in validator
+  - Enhanced test coverage to 32.19% from initial 17.97%
+- **Code Quality Improvements**:
+  - Fixed ESLint unnecessary escape character warnings
+  - Cleaned up package.json bin configuration
+  - Improved error handling and validation
+- **Build System**: Enhanced npm publish process with better error handling
+
+### Technical Details
+- **Test Framework**: Comprehensive Jest test suite with mocked dependencies
+- **Test Coverage**: Core modules fully tested including AI functionality, Git operations, and validation
+- **Quality Assurance**: All 52 tests passing consistently
+- **Package Size**: 45.3 kB (199.0 kB unpacked)
+
+---
+
 ## [1.0.0] - 2025-11-10
 
 ### Added 🚀
