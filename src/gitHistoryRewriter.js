@@ -31,7 +31,7 @@ class GitHistoryRewriter {
   isValidBranchName(branchName) {
     // Branch names can contain alphanumeric, dash, underscore, slash, and dot
     // but cannot start with dot, slash, or contain special shell characters
-    return /^[a-zA-Z0-9_][\w\-\/\.]*$/.test(branchName) &&
+    return /^[a-zA-Z0-9_][\w-/.]*$/.test(branchName) &&
            !branchName.includes('..') &&
            !branchName.includes('//') &&
            branchName.length > 0 &&

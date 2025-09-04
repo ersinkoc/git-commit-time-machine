@@ -27,7 +27,7 @@ class BackupManager {
     }
 
     // Check format: starts with "backup-", contains only safe characters
-    const safePattern = /^backup-[\w\-]+$/;
+    const safePattern = /^backup-[\w-]+$/;
     return safePattern.test(backupId) &&
            !backupId.includes('..') &&
            !backupId.includes('/') &&
