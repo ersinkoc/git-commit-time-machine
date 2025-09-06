@@ -81,8 +81,18 @@ class Validator {
   static isValidPath(path) {
     if (!path || typeof path !== 'string') return false;
 
-    // Simple path validation
-    return !/[<>:"|?*]/.test(path) && path.length > 0;
+    // Enhanced path validation that handles Windows paths
+    // Allow colons only for drive letters (C:\) and exclude invalid characters
+    const invalidCharsPattern = /[<>"|?*]/;
+    const hasInvalidChars = invalidCharsPattern.test(path);
+
+    // Allow colons only for drive letters at the beginning of the path
+    const colonPattern = /:/g;
+    const colonMatches = path.match(colonPattern) || [];
+    const hasValidDriveColon = /^[A-Za-z]:/.test(path) && colonMatches.length === 1;
+    const hasInvalidColon = colonMatches.length > 0 && !hasValidDriveColon;
+
+    return !hasInvalidChars && !hasInvalidColon && path.length > 0;
   }
 
   /**

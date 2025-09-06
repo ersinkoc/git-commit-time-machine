@@ -1,6 +1,6 @@
 {
   "name": "gctm",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "🚀 Git Commit Time Machine - Comprehensive Git history manipulation tool with AI-powered commit message generation. Change commit dates, edit content, manage sensitive data, and generate creative commit messages using OpenAI, Anthropic, Google Gemini, and Local AI models.",
   "main": "src/index.js",
   "bin": {
