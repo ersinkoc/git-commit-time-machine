@@ -239,9 +239,11 @@ class BackupManager {
 
       // BUG-016 fix: Check for uncommitted changes before dangerous operations
       // BUG-NEW-011 fix: Check success status from getStatus
+      // BUG-NEW-031 fix: Explicit boolean check for success status
       if (!options.skipClean && !options.force) {
         const status = await this.git.status();
-        if (status.success !== false && !status.isClean()) {
+        // BUG-NEW-031 fix: Explicitly check status.success === true, not just !== false
+        if (status && status.success === true && !status.isClean()) {
           const uncommittedFiles = [
             ...status.modified,
             ...status.created,

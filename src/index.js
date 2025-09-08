@@ -339,8 +339,14 @@ class GitCommitTimeMachine {
 
       // BUG-NEW-011 fix: Check success status
       // BUG-NEW-014 fix: Add null check for git status
+      // BUG-NEW-044 fix: Provide actionable error guidance
       if (!status || typeof status !== 'object' || !status.success) {
-        throw new Error(status?.error || 'Failed to get repository status');
+        const errorMsg = status?.error || 'Failed to get repository status';
+        const guidance = 'Please ensure you are in a valid Git repository and have necessary permissions.';
+        throw new Error(`${errorMsg}\n${guidance}\n\nTroubleshooting steps:\n` +
+          '1. Run "git status" manually to check repository state\n' +
+          '2. Verify repository is not corrupted\n' +
+          '3. Check file system permissions');
       }
 
       // Get changed files and diff
