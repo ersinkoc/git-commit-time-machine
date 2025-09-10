@@ -367,12 +367,14 @@ class GitProcessor {
 
   /**
    * Checks repository status
+   * BUG-NEW-011 fix: Return error object instead of throwing for API consistency
    * @returns {Promise<Object>} Repository status
    */
   async getStatus() {
     try {
       const status = await this.git.status();
       return {
+        success: true,
         isClean: status.isClean(),
         currentBranch: status.current,
         staged: status.staged,
@@ -382,7 +384,10 @@ class GitProcessor {
       };
     } catch (error) {
       logger.error(`Cannot get repository status: ${error.message}`);
-      throw new Error(`Cannot get repository status: ${error.message}`);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
