@@ -19,13 +19,27 @@ class AICommitAssistant {
     this.customInstructions = options.customInstructions || '';
     this.timeout = options.timeout || 60000; // Default 60 seconds, configurable for slow networks
     this.strictValidation = options.strictValidation !== false; // BUG-011 fix: Default to strict validation
+    // BUG-NEW-017 fix: Make Ollama URL configurable
+    this.ollamaUrl = options.ollamaUrl || process.env.OLLAMA_URL || 'http://localhost:11434';
 
-    // BUG-011 fix: Validate model early to provide clear error messages
-    this.validateModelForProvider();
+    // BUG-NEW-008 fix: Catch validation errors in constructor
+    this.validationError = null;
+    try {
+      // BUG-011 fix: Validate model early to provide clear error messages
+      this.validateModelForProvider();
 
-    // BUG-024 fix: Validate API key format early
-    if (this.apiKey) {
-      this.validateApiKeyFormat();
+      // BUG-024 fix: Validate API key format early
+      if (this.apiKey) {
+        this.validateApiKeyFormat();
+      }
+    } catch (error) {
+      // Store validation error to be thrown on first use
+      this.validationError = error;
+      // Only throw immediately in strict mode, otherwise allow construction
+      if (this.strictValidation && options.throwOnValidationError !== false) {
+        throw error;
+      }
+      logger.warn(`AI Assistant validation warning: ${error.message}`);
     }
   }
 
@@ -161,6 +175,32 @@ class AICommitAssistant {
   }
 
   /**
+   * BUG-NEW-004 fix: Sanitize error messages to prevent API key leakage
+   * @param {string} errorMessage - Raw error message from API
+   * @returns {string} Sanitized error message
+   */
+  sanitizeErrorMessage(errorMessage) {
+    if (!errorMessage || typeof errorMessage !== 'string') {
+      return 'Unknown error occurred';
+    }
+
+    // Remove potential API key patterns from error messages
+    let sanitized = errorMessage
+      // OpenAI keys: sk-...
+      .replace(/sk-[a-zA-Z0-9]{20,}/g, 'sk-***REDACTED***')
+      // Anthropic keys: sk-ant-...
+      .replace(/sk-ant-[a-zA-Z0-9_-]{20,}/g, 'sk-ant-***REDACTED***')
+      // Generic API keys
+      .replace(/api[_-]?key["\s:=]+[a-zA-Z0-9_-]{20,}/gi, 'api_key=***REDACTED***')
+      // Bearer tokens
+      .replace(/Bearer\s+[a-zA-Z0-9_-]{20,}/gi, 'Bearer ***REDACTED***')
+      // Authorization headers
+      .replace(/authorization["\s:=]+[a-zA-Z0-9_-]{20,}/gi, 'authorization: ***REDACTED***');
+
+    return sanitized;
+  }
+
+  /**
    * Initialize AI assistant configuration
    * @returns {Promise<Object>} Configuration status
    */
@@ -186,14 +226,98 @@ class AICommitAssistant {
   }
 
   /**
+   * BUG-NEW-020 fix: Validate config object against schema
+   * @param {Object} config - Configuration object to validate
+   * @returns {Object} Validated and sanitized config
+   * @throws {Error} If config contains invalid values
+   */
+  validateConfigSchema(config) {
+    if (!config || typeof config !== 'object') {
+      throw new Error('Config must be an object');
+    }
+
+    // Whitelist of allowed config properties
+    const allowedProps = [
+      'apiProvider', 'model', 'maxTokens', 'temperature',
+      'language', 'style', 'customInstructions', 'timeout', 'ollamaUrl'
+    ];
+
+    // Filter out non-whitelisted properties
+    const validatedConfig = {};
+    for (const key of allowedProps) {
+      if (key in config) {
+        validatedConfig[key] = config[key];
+      }
+    }
+
+    // Validate specific properties
+    if (validatedConfig.apiProvider && !['openai', 'anthropic', 'google', 'local'].includes(validatedConfig.apiProvider)) {
+      throw new Error(`Invalid apiProvider: ${validatedConfig.apiProvider}`);
+    }
+
+    if (validatedConfig.maxTokens !== undefined) {
+      const tokens = Number(validatedConfig.maxTokens);
+      if (isNaN(tokens) || tokens < 1 || tokens > 4000) {
+        throw new Error(`Invalid maxTokens: must be between 1 and 4000`);
+      }
+      validatedConfig.maxTokens = tokens;
+    }
+
+    if (validatedConfig.temperature !== undefined) {
+      const temp = Number(validatedConfig.temperature);
+      if (isNaN(temp) || temp < 0 || temp > 2) {
+        throw new Error(`Invalid temperature: must be between 0 and 2`);
+      }
+      validatedConfig.temperature = temp;
+    }
+
+    if (validatedConfig.timeout !== undefined) {
+      const timeout = Number(validatedConfig.timeout);
+      if (isNaN(timeout) || timeout < 1000 || timeout > 300000) {
+        throw new Error(`Invalid timeout: must be between 1000 and 300000 ms`);
+      }
+      validatedConfig.timeout = timeout;
+    }
+
+    const validLanguages = ['en', 'tr', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'ru', 'ja', 'zh', 'ko'];
+    if (validatedConfig.language && !validLanguages.includes(validatedConfig.language)) {
+      throw new Error(`Invalid language: ${validatedConfig.language}`);
+    }
+
+    const validStyles = ['conventional', 'descriptive', 'minimal', 'humorous'];
+    if (validatedConfig.style && !validStyles.includes(validatedConfig.style)) {
+      throw new Error(`Invalid style: ${validatedConfig.style}`);
+    }
+
+    if (validatedConfig.customInstructions !== undefined && typeof validatedConfig.customInstructions !== 'string') {
+      throw new Error('customInstructions must be a string');
+    }
+
+    if (validatedConfig.ollamaUrl !== undefined) {
+      if (typeof validatedConfig.ollamaUrl !== 'string' || !validatedConfig.ollamaUrl.startsWith('http')) {
+        throw new Error('ollamaUrl must be a valid HTTP/HTTPS URL');
+      }
+    }
+
+    return validatedConfig;
+  }
+
+  /**
    * Load configuration from file
+   * BUG-NEW-020 fix: Validate config before assignment
    */
   async loadConfig() {
     try {
       if (await fs.pathExists(this.configPath)) {
-        const config = await fs.readJson(this.configPath);
-        Object.assign(this, config);
-        logger.debug('AI configuration loaded from file');
+        const rawConfig = await fs.readJson(this.configPath);
+
+        // Validate and sanitize config
+        const validatedConfig = this.validateConfigSchema(rawConfig);
+
+        // Only assign validated properties
+        Object.assign(this, validatedConfig);
+
+        logger.debug('AI configuration loaded and validated from file');
       }
     } catch (error) {
       logger.warn(`Could not load AI config: ${error.message}`);
@@ -237,6 +361,11 @@ class AICommitAssistant {
    */
   async generateCommitMessage(options = {}) {
     try {
+      // BUG-NEW-008 fix: Check for validation errors before proceeding
+      if (this.validationError) {
+        throw new Error(`AI Assistant configuration error: ${this.validationError.message}`);
+      }
+
       const {
         changedFiles = [],
         diff = '',
@@ -246,7 +375,7 @@ class AICommitAssistant {
         context = ''
       } = options;
 
-      if (!this.apiKey) {
+      if (!this.apiKey && this.apiProvider !== 'local') {
         throw new Error('AI API key not configured');
       }
 
@@ -524,7 +653,10 @@ Provide 3 different options, numbered 1-3.`;
         message: content
       };
     } catch (error) {
-      throw new Error(`OpenAI API error: ${error.response?.data?.error?.message || error.message}`);
+      // BUG-NEW-004 fix: Sanitize error message before throwing
+      const rawError = error.response?.data?.error?.message || error.message;
+      const sanitizedError = this.sanitizeErrorMessage(rawError);
+      throw new Error(`OpenAI API error: ${sanitizedError}`);
     }
   }
 
@@ -597,7 +729,10 @@ Provide 3 different options, numbered 1-3.`;
         message: text
       };
     } catch (error) {
-      throw new Error(`Anthropic API error: ${error.response?.data?.error?.message || error.message}`);
+      // BUG-NEW-004 fix: Sanitize error message before throwing
+      const rawError = error.response?.data?.error?.message || error.message;
+      const sanitizedError = this.sanitizeErrorMessage(rawError);
+      throw new Error(`Anthropic API error: ${sanitizedError}`);
     }
   }
 
@@ -678,7 +813,10 @@ Provide 3 different options, numbered 1-3.`;
         message: text
       };
     } catch (error) {
-      throw new Error(`Google Gemini API error: ${error.response?.data?.error?.message || error.message}`);
+      // BUG-NEW-004 fix: Sanitize error message before throwing
+      const rawError = error.response?.data?.error?.message || error.message;
+      const sanitizedError = this.sanitizeErrorMessage(rawError);
+      throw new Error(`Google Gemini API error: ${sanitizedError}`);
     }
   }
 
@@ -746,7 +884,8 @@ Provide 3 different options, numbered 1-3.`;
         logger.warn(`Model ${modelToUse} may not be available. Popular choices: llama3.3:70b, phi4:14b, deepseek-r1:14b, qwen2.5:72b`);
       }
 
-      const response = await axios.post('http://localhost:11434/api/generate', {
+      // BUG-NEW-017 fix: Use configurable Ollama URL
+      const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
         model: modelToUse,
         prompt: prompt,
         options: {
