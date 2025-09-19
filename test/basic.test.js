@@ -24,6 +24,9 @@ describe('GitCommitTimeMachine', () => {
     await git.init();
     await git.addConfig('user.name', 'Test User');
     await git.addConfig('user.email', 'test@example.com');
+    // BUG-037 fix: Disable commit signing for test environment
+    await git.addConfig('commit.gpgsign', 'false');
+    await git.addConfig('tag.gpgsign', 'false');
 
     // Create test files
     await fs.writeFile(path.join(testRepoPath, 'test1.txt'), 'Test content 1');
