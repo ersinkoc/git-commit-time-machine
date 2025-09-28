@@ -70,11 +70,13 @@ class GitHistoryRewriter {
    * @returns {Promise<Object>} Operation result
    */
   async changeCommitDates(commitsWithNewDates) {
+    let backupBranch = null;
+
     try {
       logger.info('Starting Git history rewrite for date changes...');
 
       // Create backup branch
-      const backupBranch = await this.createBackupBranch();
+      backupBranch = await this.createBackupBranch();
 
       try {
         // Get current state
@@ -95,11 +97,17 @@ class GitHistoryRewriter {
         }
 
         logger.success(`Successfully changed dates for ${processedCount} commits`);
+
+        // BUG-018 fix: Clean up backup branch after successful operation
+        await this.cleanupBackupBranches([backupBranch]);
+        logger.debug(`Cleaned up backup branch: ${backupBranch}`);
+
         return { success: true, processed: processedCount };
 
       } catch (error) {
-        // Restore from backup if something went wrong
+        // Restore from backup if something went wrong (keep backup on error)
         await this.restoreFromBranch(backupBranch);
+        logger.info(`Backup branch ${backupBranch} preserved for recovery`);
         throw error;
       }
 
@@ -157,17 +165,20 @@ class GitHistoryRewriter {
    * @returns {Promise<Object>} Operation result
    */
   async replaceContentInHistory(replacements) {
+    let tempDir = null;
+    let backupBranch = null;
+
     try {
       logger.info('Starting content replacement in Git history...');
 
       // Create backup branch
-      const backupBranch = await this.createBackupBranch();
+      backupBranch = await this.createBackupBranch();
 
       try {
         this.originalBranch = await this.getCurrentBranch();
 
         // Create a temp working directory
-        const tempDir = await this.createTempWorkingDirectory();
+        tempDir = await this.createTempWorkingDirectory();
 
         // Get all commits to process
         const commits = await this.getAllCommitHashes();
@@ -184,10 +195,12 @@ class GitHistoryRewriter {
           }
         }
 
-        // Clean up temp directory
-        await fs.remove(tempDir);
-
         logger.success(`Successfully processed ${processedCount} commits for content replacement`);
+
+        // BUG-018 fix: Clean up backup branch after successful operation
+        await this.cleanupBackupBranches([backupBranch]);
+        logger.debug(`Cleaned up backup branch: ${backupBranch}`);
+
         return { success: true, processed: processedCount };
 
       } catch (error) {
@@ -199,6 +212,16 @@ class GitHistoryRewriter {
     } catch (error) {
       logger.error(`Failed to replace content: ${error.message}`);
       return { success: false, error: error.message };
+    } finally {
+      // BUG-017 fix: Always clean up temp directory in finally block
+      if (tempDir) {
+        try {
+          await fs.remove(tempDir);
+          logger.debug(`Cleaned up temp directory: ${tempDir}`);
+        } catch (cleanupError) {
+          logger.warn(`Failed to clean up temp directory: ${cleanupError.message}`);
+        }
+      }
     }
   }
 

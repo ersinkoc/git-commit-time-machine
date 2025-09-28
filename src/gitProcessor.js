@@ -209,15 +209,16 @@ class GitProcessor {
           newMessage
         };
       } else {
-        // For historical commits, use history rewriter
-        // This is a more complex operation
-        logger.warn(`Changing message for historical commit ${commitHash} requires history rewrite`);
+        // BUG-019 fix: Provide clear guidance for historical commit editing
+        logger.warn(`Changing message for historical commit ${commitHash} requires Git history rewrite`);
+        logger.info('Historical commit message editing is a destructive operation that rewrites Git history');
 
-        // For now, return not implemented for historical commits
         return {
           success: false,
           hash: commitHash,
-          error: 'Changing message for historical commits is not yet implemented'
+          error: 'Changing historical commit messages requires interactive rebase. Use: git rebase -i <commit>^ and edit the commit, or use the GitHistoryRewriter class directly with caution. This operation rewrites history and may cause issues for shared repositories.',
+          requiresHistoryRewrite: true,
+          suggestion: `Run: git rebase -i ${commitHash}^ and change 'pick' to 'reword' for the target commit`
         };
       }
     } catch (error) {

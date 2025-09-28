@@ -10,7 +10,7 @@ class AICommitAssistant {
   constructor(options = {}) {
     this.apiKey = options.apiKey || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GOOGLE_API_KEY || process.env.AI_API_KEY;
     this.apiProvider = options.provider || 'openai'; // openai, anthropic, google, local
-    this.model = options.model || 'gpt-4-turbo'; // Default to valid OpenAI model
+    this.model = options.model || this.getDefaultModel(options.provider || 'openai');
     this.maxTokens = options.maxTokens || 150;
     this.temperature = options.temperature || 0.7;
     this.language = options.language || 'en'; // en, tr, es, fr, de, etc.
@@ -18,6 +18,123 @@ class AICommitAssistant {
     this.configPath = options.configPath || '.gctm-ai-config.json';
     this.customInstructions = options.customInstructions || '';
     this.timeout = options.timeout || 60000; // Default 60 seconds, configurable for slow networks
+
+    // BUG-011 fix: Validate model early to provide clear error messages
+    this.validateModelForProvider();
+
+    // BUG-024 fix: Validate API key format early
+    if (this.apiKey) {
+      this.validateApiKeyFormat();
+    }
+  }
+
+  /**
+   * Get default model for provider (BUG-011 fix helper)
+   * @param {string} provider - API provider
+   * @returns {string} Default model name
+   */
+  getDefaultModel(provider) {
+    const defaults = {
+      openai: 'gpt-4-turbo',
+      anthropic: 'claude-haiku-4-5-20251015',
+      google: 'gemini-2.5-flash',
+      local: 'llama3.3:70b'
+    };
+    return defaults[provider] || 'gpt-4-turbo';
+  }
+
+  /**
+   * Validate model against provider's supported models (BUG-011 fix)
+   * @throws {Error} If model is not supported
+   */
+  validateModelForProvider() {
+    const supportedModels = this.getSupportedModels(this.apiProvider);
+
+    if (!supportedModels.includes(this.model)) {
+      logger.warn(`Model '${this.model}' may not be supported by ${this.apiProvider}. Supported models: ${supportedModels.slice(0, 5).join(', ')}...`);
+      logger.info(`To avoid API errors, consider using: ${supportedModels.slice(0, 3).join(', ')}`);
+    }
+  }
+
+  /**
+   * Validate API key format (BUG-024 fix)
+   */
+  validateApiKeyFormat() {
+    if (!this.apiKey || typeof this.apiKey !== 'string') {
+      return;
+    }
+
+    const trimmedKey = this.apiKey.trim();
+
+    // Basic format validation by provider
+    switch (this.apiProvider) {
+      case 'openai':
+        // OpenAI keys typically start with 'sk-' and are 48+ characters
+        if (!trimmedKey.startsWith('sk-') || trimmedKey.length < 40) {
+          logger.warn('OpenAI API key format may be invalid. Expected format: sk-...');
+        }
+        break;
+      case 'anthropic':
+        // Anthropic keys typically start with 'sk-ant-'
+        if (!trimmedKey.startsWith('sk-ant-') && !trimmedKey.startsWith('sk-')) {
+          logger.warn('Anthropic API key format may be invalid. Expected format: sk-ant-...');
+        }
+        break;
+      case 'google':
+        // Google API keys are typically 39 characters
+        if (trimmedKey.length < 30) {
+          logger.warn('Google API key format may be invalid. Expected length: 39 characters');
+        }
+        break;
+      // Local doesn't require API key
+    }
+
+    // Check for common mistakes
+    if (trimmedKey.includes(' ')) {
+      logger.error('API key contains spaces - this will cause authentication errors');
+    }
+    if (trimmedKey.includes('\n') || trimmedKey.includes('\r')) {
+      logger.error('API key contains newlines - this will cause authentication errors');
+    }
+  }
+
+  /**
+   * Get supported models for a provider (BUG-011 fix helper)
+   * @param {string} provider - API provider
+   * @returns {Array<string>} List of supported model names
+   */
+  getSupportedModels(provider) {
+    const models = {
+      openai: [
+        'gpt-5-main', 'gpt-5-main-mini', 'gpt-5-thinking', 'gpt-5-thinking-mini', 'gpt-5-thinking-nano',
+        'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+        'gpt-4o', 'gpt-4o-mini', 'gpt-4o-realtime',
+        'o1', 'o3', 'o4-mini', 'o4-mini-high',
+        'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'
+      ],
+      anthropic: [
+        'claude-sonnet-4-5-20250929',
+        'claude-sonnet-4-20250522',
+        'claude-opus-4-1-20250805',
+        'claude-sonnet-3-7-20250224',
+        'claude-haiku-4-5-20251015',
+        'claude-3-5-haiku-20241022',
+        'claude-3-5-sonnet-20241022',
+        'claude-3-opus-20240229'
+      ],
+      google: [
+        'gemini-2.5-pro', 'gemini-2.5-flash',
+        'gemini-2.5-flash-native-audio',
+        'gemini-pro', 'gemini-pro-vision'
+      ],
+      local: [
+        'llama3.3', 'llama3.3:70b', 'llama3.2', 'llama3.1',
+        'deepseek-r1', 'deepseek-r1:14b', 'deepseek-v3.1-terminus',
+        'qwen3', 'qwen2.5', 'phi4', 'phi4:14b',
+        'gemma3', 'mistral', 'mixtral'
+      ]
+    };
+    return models[provider] || [];
   }
 
   /**
