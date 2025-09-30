@@ -5,11 +5,63 @@ const logger = require('./utils/logger');
 
 /**
  * Git History Rewriter - Practical approach to modify Git history
+ * SECURITY: All git commands use spawnSync with argument arrays to prevent command injection
  */
 class GitHistoryRewriter {
   constructor(repoPath) {
     this.repoPath = repoPath;
     this.originalBranch = null;
+    this.GIT_TIMEOUT = 60000; // 60 second timeout for git operations
+  }
+
+  /**
+   * Validate commit hash format to prevent injection attacks
+   * @param {string} hash - Commit hash to validate
+   * @returns {boolean} Whether hash is valid
+   */
+  isValidHash(hash) {
+    return /^[a-f0-9]{7,40}$/i.test(hash);
+  }
+
+  /**
+   * Validate branch name to prevent injection attacks
+   * @param {string} branchName - Branch name to validate
+   * @returns {boolean} Whether branch name is valid
+   */
+  isValidBranchName(branchName) {
+    // Branch names can contain alphanumeric, dash, underscore, slash, and dot
+    // but cannot start with dot, slash, or contain special shell characters
+    return /^[a-zA-Z0-9_][\w\-\/\.]*$/.test(branchName) &&
+           !branchName.includes('..') &&
+           !branchName.includes('//') &&
+           branchName.length > 0 &&
+           branchName.length < 256;
+  }
+
+  /**
+   * Execute git command safely with timeout
+   * @param {Array} args - Git command arguments
+   * @param {Object} options - Additional options
+   * @returns {Object} Result with stdout, stderr, status
+   */
+  executeGitCommand(args, options = {}) {
+    const result = spawnSync('git', args, {
+      cwd: this.repoPath,
+      encoding: 'utf8',
+      timeout: options.timeout || this.GIT_TIMEOUT,
+      env: options.env || process.env,
+      ...options
+    });
+
+    if (result.error) {
+      throw new Error(`Git command failed: ${result.error.message}`);
+    }
+
+    return {
+      stdout: result.stdout || '',
+      stderr: result.stderr || '',
+      status: result.status
+    };
   }
 
   /**
@@ -64,9 +116,18 @@ class GitHistoryRewriter {
   async rewriteSingleCommitDate(commitData) {
     const { hash, newDate } = commitData;
 
-    // Reset to the commit before the target
+    // SECURITY: Validate commit hash format to prevent injection
+    if (!this.isValidHash(hash)) {
+      throw new Error(`Invalid commit hash format: ${hash}`);
+    }
+
+    // Reset to the commit before the target - using spawnSync to prevent command injection
     try {
-      execSync(`git reset --hard ${hash}`, { cwd: this.repoPath, stdio: 'pipe' });
+      const result = this.executeGitCommand(['reset', '--hard', hash]);
+
+      if (result.status !== 0) {
+        throw new Error(result.stderr || 'Reset failed');
+      }
     } catch (error) {
       throw new Error(`Cannot reset to commit ${hash}: ${error.message}`);
     }
@@ -78,13 +139,13 @@ class GitHistoryRewriter {
       GIT_COMMITTER_DATE: newDate
     };
 
-    // Amend the commit with new date
+    // Amend the commit with new date - using spawnSync to prevent command injection
     try {
-      execSync('git commit --amend --no-edit', {
-        cwd: this.repoPath,
-        env,
-        stdio: 'pipe'
-      });
+      const result = this.executeGitCommand(['commit', '--amend', '--no-edit'], { env });
+
+      if (result.status !== 0) {
+        throw new Error(result.stderr || 'Amend failed');
+      }
     } catch (error) {
       throw new Error(`Cannot amend commit ${hash}: ${error.message}`);
     }
@@ -150,8 +211,16 @@ class GitHistoryRewriter {
    */
   async processCommitForContentReplacement(commitHash, replacements, tempDir) {
     try {
-      // Reset to the commit
-      execSync(`git reset --hard ${commitHash}`, { cwd: this.repoPath, stdio: 'pipe' });
+      // SECURITY: Validate commit hash
+      if (!this.isValidHash(commitHash)) {
+        throw new Error(`Invalid commit hash: ${commitHash}`);
+      }
+
+      // Reset to the commit - using safe git execution
+      const resetResult = this.executeGitCommand(['reset', '--hard', commitHash]);
+      if (resetResult.status !== 0) {
+        throw new Error(resetResult.stderr || 'Reset failed');
+      }
 
       // Find files to modify
       const modifiedFiles = await this.findFilesWithPatterns(replacements);
@@ -185,8 +254,16 @@ class GitHistoryRewriter {
 
       // Amend commit if any files were modified
       if (fileModified) {
-        execSync('git add .', { cwd: this.repoPath, stdio: 'pipe' });
-        execSync('git commit --amend --no-edit', { cwd: this.repoPath, stdio: 'pipe' });
+        const addResult = this.executeGitCommand(['add', '.']);
+        if (addResult.status !== 0) {
+          throw new Error(addResult.stderr || 'Git add failed');
+        }
+
+        const commitResult = this.executeGitCommand(['commit', '--amend', '--no-edit']);
+        if (commitResult.status !== 0) {
+          throw new Error(commitResult.stderr || 'Git commit amend failed');
+        }
+
         return true;
       }
 
@@ -216,7 +293,8 @@ class GitHistoryRewriter {
         const result = spawnSync('git', ['grep', '-l', pattern], {
           cwd: this.repoPath,
           encoding: 'utf8',
-          shell: false // Prevent shell interpretation
+          shell: false, // Prevent shell interpretation
+          timeout: this.GIT_TIMEOUT
         });
 
         // git grep exits with code 1 if no matches (not an error)
@@ -241,12 +319,13 @@ class GitHistoryRewriter {
    */
   async getAllCommitHashes() {
     try {
-      const output = execSync('git rev-list HEAD', {
-        cwd: this.repoPath,
-        encoding: 'utf8'
-      });
+      const result = this.executeGitCommand(['rev-list', 'HEAD']);
 
-      return output.trim().split('\n').filter(hash => hash);
+      if (result.status !== 0) {
+        throw new Error(result.stderr || 'Failed to get commit list');
+      }
+
+      return result.stdout.trim().split('\n').filter(hash => hash && this.isValidHash(hash));
     } catch (error) {
       throw new Error(`Cannot get commit list: ${error.message}`);
     }
@@ -269,8 +348,18 @@ class GitHistoryRewriter {
   async createBackupBranch() {
     const backupBranch = 'gctm-backup-' + Date.now();
 
+    // SECURITY: Validate branch name
+    if (!this.isValidBranchName(backupBranch)) {
+      throw new Error(`Invalid backup branch name: ${backupBranch}`);
+    }
+
     try {
-      execSync(`git branch ${backupBranch}`, { cwd: this.repoPath });
+      const result = this.executeGitCommand(['branch', backupBranch]);
+
+      if (result.status !== 0) {
+        throw new Error(result.stderr || 'Failed to create backup branch');
+      }
+
       logger.info(`Created backup branch: ${backupBranch}`);
       return backupBranch;
     } catch (error) {
@@ -284,11 +373,8 @@ class GitHistoryRewriter {
    */
   async getCurrentBranch() {
     try {
-      const output = execSync('git rev-parse --abbrev-ref HEAD', {
-        cwd: this.repoPath,
-        encoding: 'utf8'
-      });
-      return output.trim();
+      const result = this.executeGitCommand(['rev-parse', '--abbrev-ref', 'HEAD']);
+      return result.stdout.trim() || 'HEAD';
     } catch (error) {
       return 'HEAD'; // Fallback for detached HEAD
     }
@@ -300,7 +386,17 @@ class GitHistoryRewriter {
    */
   async restoreFromBranch(backupBranch) {
     try {
-      execSync(`git reset --hard ${backupBranch}`, { cwd: this.repoPath });
+      // SECURITY: Validate branch name
+      if (!this.isValidBranchName(backupBranch)) {
+        throw new Error(`Invalid backup branch name: ${backupBranch}`);
+      }
+
+      const result = this.executeGitCommand(['reset', '--hard', backupBranch]);
+
+      if (result.status !== 0) {
+        throw new Error(result.stderr || 'Failed to restore from backup');
+      }
+
       logger.info(`Restored from backup branch: ${backupBranch}`);
     } catch (error) {
       logger.error(`Failed to restore from backup: ${error.message}`);
@@ -314,9 +410,16 @@ class GitHistoryRewriter {
   async cleanupBackupBranches(backupBranches) {
     for (const branch of backupBranches) {
       try {
-        execSync(`git branch -D ${branch}`, { cwd: this.repoPath });
+        // SECURITY: Validate branch name
+        if (!this.isValidBranchName(branch)) {
+          logger.warn(`Skipping cleanup of invalid branch name: ${branch}`);
+          continue;
+        }
+
+        this.executeGitCommand(['branch', '-D', branch]);
       } catch (error) {
         // Ignore cleanup errors
+        logger.debug(`Failed to cleanup branch ${branch}: ${error.message}`);
       }
     }
   }
