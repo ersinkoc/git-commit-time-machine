@@ -407,7 +407,7 @@ class GitProcessor {
    */
   async createBackup() {
     try {
-      const backupRef = await this.historyRewriter.createBackup();
+      const backupRef = await this.historyRewriter.createBackupBranch();
       return {
         success: true,
         backupRef
@@ -427,7 +427,7 @@ class GitProcessor {
    */
   async restoreFromBackup(backupRef) {
     try {
-      await this.historyRewriter.restoreFromBackup(backupRef);
+      await this.historyRewriter.restoreFromBranch(backupRef);
       return {
         success: true
       };

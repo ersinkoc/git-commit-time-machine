@@ -66,10 +66,17 @@ class DateManager {
 
         let targetDate = moment(start).add(minutes, 'minutes');
 
-        // Add random variation (optional)
+        // Add random variation (optional) with boundary checks
         if (randomize) {
           const variation = Math.floor(Math.random() * 60) - 30; // -30 to +30 minutes
           targetDate = targetDate.add(variation, 'minutes');
+
+          // Ensure date stays within boundaries
+          if (targetDate.isBefore(start)) {
+            targetDate = moment(start);
+          } else if (targetDate.isAfter(end)) {
+            targetDate = moment(end);
+          }
         }
 
         dates.push(targetDate.format(timeFormat));
