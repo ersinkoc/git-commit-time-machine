@@ -1,3 +1,4 @@
 node_modules/
 test-repo/
-package-lock.json
+# Keep package-lock.json for CI/CD
+# package-lock.json
