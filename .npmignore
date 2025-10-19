@@ -1,0 +1,81 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test files
+test/
+**/*.test.js
+coverage/
+.nyc_output/
+
+# Development files
+.eslintrc*
+.prettierrc*
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+.gctm-ai-config.json
+.gctm-backups/
+.gctm-logs.txt
+.gctm-temp*/
+.DS_Store
+Thumbs.db
+
+# Documentation (excluding key docs)
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Build artifacts
+dist/
+build/
+*.tgz
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
