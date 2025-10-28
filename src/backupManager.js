@@ -105,10 +105,12 @@ class BackupManager {
               backupMetadata.stashRef = stashMatch[1];
               backupMetadata.hasStash = true;
             } else {
-              backupMetadata.hasStash = true;
+              // Could not extract stash reference
+              backupMetadata.hasStash = false;
             }
           } else {
-            backupMetadata.hasStash = true;
+            // No stashes found in list
+            backupMetadata.hasStash = false;
           }
         } catch (error) {
           logger.warn('Could not create stash:', error.message);

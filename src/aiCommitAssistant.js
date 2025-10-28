@@ -10,7 +10,7 @@ class AICommitAssistant {
   constructor(options = {}) {
     this.apiKey = options.apiKey || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GOOGLE_API_KEY || process.env.AI_API_KEY;
     this.apiProvider = options.provider || 'openai'; // openai, anthropic, google, local
-    this.model = options.model || 'gpt-5-main'; // Updated to 2025 latest model
+    this.model = options.model || 'gpt-4-turbo'; // Default to valid OpenAI model
     this.maxTokens = options.maxTokens || 150;
     this.temperature = options.temperature || 0.7;
     this.language = options.language || 'en'; // en, tr, es, fr, de, etc.
@@ -62,11 +62,12 @@ class AICommitAssistant {
 
   /**
    * Save configuration to file
+   * Note: API key is NOT saved for security reasons - use environment variables
    */
   async saveConfig() {
     try {
       const config = {
-        apiKey: this.apiKey,
+        // SECURITY: Never save API key to disk - use environment variables only
         apiProvider: this.apiProvider,
         model: this.model,
         maxTokens: this.maxTokens,
@@ -77,7 +78,7 @@ class AICommitAssistant {
       };
 
       await fs.writeFile(this.configPath, JSON.stringify(config, null, 2));
-      logger.debug('AI configuration saved');
+      logger.debug('AI configuration saved (API key not included for security)');
     } catch (error) {
       logger.warn(`Could not save AI config: ${error.message}`);
     }
@@ -496,7 +497,7 @@ Provide 3 different options, numbered 1-3.`;
       }
 
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${this.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent`,
         {
           contents: [
             {
@@ -515,6 +516,7 @@ Provide 3 different options, numbered 1-3.`;
         },
         {
           headers: {
+            'x-goog-api-key': this.apiKey,
             'Content-Type': 'application/json'
           },
           timeout: this.timeout

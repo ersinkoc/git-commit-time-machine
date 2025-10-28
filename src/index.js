@@ -315,7 +315,7 @@ class GitCommitTimeMachine {
       // Generate AI commit message
       const result = await this.aiAssistant.generateCommitMessage({
         changedFiles,
-        diff: diff.diff || '',
+        diff: (typeof diff === 'object' ? diff.diff : diff) || '',
         currentMessage: options.currentMessage || '',
         language: options.language || this.aiAssistant.language,
         style: options.style || this.aiAssistant.style,
