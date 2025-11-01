@@ -33,6 +33,15 @@ class GitCommitTimeMachine {
     try {
       logger.info('Redating commits...');
 
+      // Validate date formats before proceeding (BUG-020 fix)
+      const Validator = require('./utils/validator');
+      const dateValidation = Validator.validateDateRange(options.startDate, options.endDate);
+      if (!dateValidation.isValid) {
+        const errorMsg = `Date validation failed: ${dateValidation.errors.join(', ')}`;
+        logger.error(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
       if (options.createBackup) {
         await this.backupManager.createBackup();
         logger.info('Backup created');
