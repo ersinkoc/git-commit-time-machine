@@ -18,6 +18,7 @@ class AICommitAssistant {
     this.configPath = options.configPath || '.gctm-ai-config.json';
     this.customInstructions = options.customInstructions || '';
     this.timeout = options.timeout || 60000; // Default 60 seconds, configurable for slow networks
+    this.strictValidation = options.strictValidation !== false; // BUG-011 fix: Default to strict validation
 
     // BUG-011 fix: Validate model early to provide clear error messages
     this.validateModelForProvider();
@@ -45,19 +46,29 @@ class AICommitAssistant {
 
   /**
    * Validate model against provider's supported models (BUG-011 fix)
-   * @throws {Error} If model is not supported
+   * @throws {Error} If model is not supported and strictValidation is enabled
    */
   validateModelForProvider() {
     const supportedModels = this.getSupportedModels(this.apiProvider);
 
     if (!supportedModels.includes(this.model)) {
-      logger.warn(`Model '${this.model}' may not be supported by ${this.apiProvider}. Supported models: ${supportedModels.slice(0, 5).join(', ')}...`);
-      logger.info(`To avoid API errors, consider using: ${supportedModels.slice(0, 3).join(', ')}`);
+      const errorMsg = `Model '${this.model}' is not supported by ${this.apiProvider}. Supported models: ${supportedModels.slice(0, 5).join(', ')}${supportedModels.length > 5 ? '...' : ''}`;
+      const suggestions = `Consider using: ${supportedModels.slice(0, 3).join(', ')}`;
+
+      if (this.strictValidation) {
+        // BUG-011 fix: Throw error in strict mode to fail fast
+        throw new Error(`${errorMsg}\n${suggestions}`);
+      } else {
+        // Warn in non-strict mode (backward compatibility)
+        logger.warn(errorMsg);
+        logger.info(suggestions);
+      }
     }
   }
 
   /**
    * Validate API key format (BUG-024 fix)
+   * @throws {Error} If API key format is invalid and strictValidation is enabled
    */
   validateApiKeyFormat() {
     if (!this.apiKey || typeof this.apiKey !== 'string') {
@@ -65,36 +76,48 @@ class AICommitAssistant {
     }
 
     const trimmedKey = this.apiKey.trim();
+    const errors = [];
 
-    // Basic format validation by provider
+    // Check for common mistakes that will definitely fail
+    if (trimmedKey.includes(' ')) {
+      errors.push('API key contains spaces');
+    }
+    if (trimmedKey.includes('\n') || trimmedKey.includes('\r')) {
+      errors.push('API key contains newlines');
+    }
+    if (trimmedKey.length < 20) {
+      errors.push('API key is suspiciously short (< 20 characters)');
+    }
+
+    // Provider-specific format validation
     switch (this.apiProvider) {
       case 'openai':
-        // OpenAI keys typically start with 'sk-' and are 48+ characters
         if (!trimmedKey.startsWith('sk-') || trimmedKey.length < 40) {
-          logger.warn('OpenAI API key format may be invalid. Expected format: sk-...');
+          errors.push('OpenAI API key format invalid. Expected: sk-... (48+ chars)');
         }
         break;
       case 'anthropic':
-        // Anthropic keys typically start with 'sk-ant-'
         if (!trimmedKey.startsWith('sk-ant-') && !trimmedKey.startsWith('sk-')) {
-          logger.warn('Anthropic API key format may be invalid. Expected format: sk-ant-...');
+          errors.push('Anthropic API key format invalid. Expected: sk-ant-... or sk-...');
         }
         break;
       case 'google':
-        // Google API keys are typically 39 characters
         if (trimmedKey.length < 30) {
-          logger.warn('Google API key format may be invalid. Expected length: 39 characters');
+          errors.push('Google API key format invalid. Expected: 39 characters');
         }
         break;
       // Local doesn't require API key
     }
 
-    // Check for common mistakes
-    if (trimmedKey.includes(' ')) {
-      logger.error('API key contains spaces - this will cause authentication errors');
-    }
-    if (trimmedKey.includes('\n') || trimmedKey.includes('\r')) {
-      logger.error('API key contains newlines - this will cause authentication errors');
+    // BUG-024 fix: Handle validation errors appropriately
+    if (errors.length > 0) {
+      const errorMsg = `API key validation failed:\n${errors.map(e => `  - ${e}`).join('\n')}`;
+
+      if (this.strictValidation) {
+        throw new Error(errorMsg);
+      } else {
+        errors.forEach(err => logger.error(err));
+      }
     }
   }
 
