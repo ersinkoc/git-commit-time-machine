@@ -206,6 +206,25 @@ class BackupManager {
 
       logger.info(`Restoring backup: ${backupId}`);
 
+      // BUG-016 fix: Check for uncommitted changes before dangerous operations
+      if (!options.skipClean && !options.force) {
+        const status = await this.git.status();
+        if (!status.isClean()) {
+          const uncommittedFiles = [
+            ...status.modified,
+            ...status.created,
+            ...status.deleted,
+            ...status.staged
+          ];
+          logger.warn(`Warning: ${uncommittedFiles.length} uncommitted changes detected`);
+          logger.warn('These changes will be lost during restore. Use {force: true} to proceed anyway.');
+          return {
+            success: false,
+            error: `Uncommitted changes detected: ${uncommittedFiles.slice(0, 5).join(', ')}${uncommittedFiles.length > 5 ? '...' : ''}. Commit or stash changes first, or use {force: true} option.`
+          };
+        }
+      }
+
       // Clean current state first
       if (!options.skipClean) {
         await this.git.clean(['-fd']);
