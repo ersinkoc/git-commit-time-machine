@@ -1,4 +1,4 @@
-const { execSync, spawn, spawnSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const fs = require('fs-extra');
 const path = require('path');
 const logger = require('./utils/logger');
@@ -338,17 +338,49 @@ class GitHistoryRewriter {
 
   /**
    * Get all commit hashes from current branch
+   * BUG-NEW-010 fix: Get commit hashes with optional pagination to prevent memory issues
+   * @param {Object} options - Pagination options
+   * @param {number} options.limit - Maximum number of commits to return (0 = no limit)
+   * @param {number} options.skip - Number of commits to skip
+   * @param {number} options.warnThreshold - Warn if commits exceed this threshold (default: 10000)
    * @returns {Promise<Array>} Array of commit hashes
    */
-  async getAllCommitHashes() {
+  async getAllCommitHashes(options = {}) {
     try {
-      const result = this.executeGitCommand(['rev-list', 'HEAD']);
+      const { limit = 0, skip = 0, warnThreshold = 10000 } = options;
+
+      // First, get total commit count efficiently
+      const countResult = this.executeGitCommand(['rev-list', '--count', 'HEAD']);
+      if (countResult.status === 0) {
+        const totalCommits = parseInt(countResult.stdout.trim(), 10);
+        if (totalCommits > warnThreshold && limit === 0) {
+          logger.warn(`Repository has ${totalCommits} commits. Consider using pagination to avoid memory issues.`);
+          logger.warn(`You can limit the operation scope or use --max-count option.`);
+        }
+      }
+
+      // Build git command with pagination options
+      const args = ['rev-list', 'HEAD'];
+      if (skip > 0) {
+        args.push(`--skip=${skip}`);
+      }
+      if (limit > 0) {
+        args.push(`--max-count=${limit}`);
+      }
+
+      const result = this.executeGitCommand(args);
 
       if (result.status !== 0) {
         throw new Error(result.stderr || 'Failed to get commit list');
       }
 
-      return result.stdout.trim().split('\n').filter(hash => hash && this.isValidHash(hash));
+      const hashes = result.stdout.trim().split('\n').filter(hash => hash && this.isValidHash(hash));
+
+      if (hashes.length === 0) {
+        logger.warn('No valid commit hashes found');
+      }
+
+      return hashes;
     } catch (error) {
       throw new Error(`Cannot get commit list: ${error.message}`);
     }
