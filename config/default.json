@@ -1,0 +1,68 @@
+{
+  "logLevel": "info",
+  "enableFileLogging": true,
+  "logFile": ".gctm-logs.txt",
+  "backup": {
+    "autoBackup": true,
+    "maxBackups": 10,
+    "maxAgeDays": 30,
+    "includeUncommitted": false
+  },
+  "date": {
+    "defaultFormat": "YYYY-MM-DD",
+    "timeFormat": "YYYY-MM-DD HH:mm:ss",
+    "preserveOrder": true,
+    "randomize": false
+  },
+  "sanitize": {
+    "hideEmails": true,
+    "hidePhones": true,
+    "hideApiKeys": true,
+    "hideIPs": false,
+    "hideUrls": false,
+    "emailReplacement": "***EMAIL***",
+    "phoneReplacement": "***PHONE***",
+    "apiKeyReplacement": "***API_KEY***",
+    "ipReplacement": "***IP***",
+    "urlReplacement": "***URL***"
+  },
+  "git": {
+    "maxCommitsPerOperation": 1000,
+    "defaultBranch": "HEAD",
+    "allowForcePush": false,
+    "confirmDestructiveOperations": true
+  },
+  "cli": {
+    "interactiveMode": true,
+    "showProgress": true,
+    "colorOutput": true,
+    "confirmBeforeExit": false
+  },
+  "patterns": {
+    "email": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+    "phone": "(\\+?\\d{1,3}[-.\\s]?)?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}",
+    "apiKey": "([A-Z_]+_?(KEY|TOKEN|SECRET|PASSWORD|PASS|API_KEY|SECRET_KEY)=)([^\\s\\n]+)",
+    "ipAddress": "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+    "url": "(https?:\\/\\/[^\\s]+)",
+    "creditCard": "\\b(?:\\d[ -]*?){13,16}\\b"
+  },
+  "fileTypes": {
+    "text": [
+      ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".c", ".cpp", ".h", ".cs",
+      ".php", ".rb", ".go", ".rs", ".swift", ".kt", ".scala", ".r", ".m",
+      ".sh", ".bat", ".ps1", ".yml", ".yaml", ".json", ".xml", ".csv",
+      ".md", ".txt", ".log", ".ini", ".cfg", ".conf", ".env", ".gitignore",
+      ".dockerfile", "Dockerfile", ".sql", ".html", ".css", ".scss", ".sass",
+      ".less", ".vue", ".svelte"
+    ],
+    "config": [
+      ".env", ".env.local", ".env.development", ".env.production", ".env.test",
+      "config.js", "config.json", "config.yml", "config.yaml", "settings.json",
+      "package.json", "composer.json", "requirements.txt", "Pipfile", "Gemfile"
+    ],
+    "exclude": [
+      ".git", "node_modules", ".vscode", ".idea", "dist", "build", "coverage",
+      ".nyc_output", ".pytest_cache", "__pycache__", ".DS_Store", "Thumbs.db"
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+          scope: ''
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes in this release
+            - Git Commit Time Machine v1.0.0 - Initial Release
+            - AI-powered commit message generation with 12 language support
+            - Git history manipulation (dates, messages, content)
+            - Sensitive data sanitization and backup system
+            - Support for OpenAI, Anthropic, Google Gemini, and Local AI models
+
+            ## Installation
+            ```bash
+            npm install -g gctm
+            ```
+
+            ## Quick Start
+            ```bash
+            # Generate AI commit message
+            gctm ai-generate --language tr --style humorous
+
+            # Change commit dates
+            gctm redate --start "2023-01-01" --end "2023-01-30" --backup
+
+            # Sanitize sensitive data
+            gctm sanitize --patterns "apiKeys,email" --replacement "***REDACTED***"
+            ```
+          draft: false
+          prerelease: false

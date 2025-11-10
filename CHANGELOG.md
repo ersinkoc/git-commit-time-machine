@@ -1,0 +1,113 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0] - 2025-11-10
+
+### Added 🚀
+- **Initial Release**: Complete Git Commit Time Machine tool
+- **AI-Powered Commit Messages**: Generate creative commit messages using multiple AI providers
+  - OpenAI: GPT-5, GPT-4.1, GPT-4o, and legacy models
+  - Anthropic Claude: Claude 4.5, Claude 4.1, and legacy models
+  - Google Gemini: Gemini 2.5, Gemma 3, and legacy models
+  - Local AI: Ollama with 100+ models (Llama 3.3, DeepSeek-R1, Phi-4, etc.)
+- **Multi-Language Support**: AI commit generation in 12 languages
+  - English, Turkish, Spanish, French, German, Italian, Portuguese, Dutch, Russian, Japanese, Chinese, Korean
+- **Commit Message Styles**: Conventional, Descriptive, Minimal, Humorous
+- **Git History Manipulation**:
+  - Change commit dates within specified ranges
+  - Edit commit messages and content
+  - Sanitize sensitive data from repository history
+- **Security Features**:
+  - Sensitive data detection and replacement
+  - API key management and hiding
+  - Secure backup and restore system
+- **Date Analysis**: Comprehensive commit date and time analysis
+- **CLI Interface**: Full command-line interface with interactive modes
+- **Package Distribution**: Available as npm package `gctm`
+- **Configuration Management**: AI provider and model configuration
+- **Testing Suite**: 24 comprehensive tests covering all functionality
+- **Content Editor**: Pattern-based content replacement and sanitization
+- **Backup Manager**: Complete backup and restore system with metadata
+
+### Features
+- **Git History Rewriting**: Safely modify commit dates, messages, and content
+- **AI Integration**: Multiple AI providers with 2025 latest models
+- **Multi-Platform Support**: Windows, macOS, Linux
+- **Developer Tools**: CLI commands for all operations
+- **Backup Safety**: Automatic backup creation before operations
+- **Sensitive Data Protection**: Detect and hide API keys, emails, passwords
+
+### Technical Details
+- **Node.js**: >= 14.0.0 required
+- **Dependencies**: 8 production dependencies
+- **Package Size**: 39.7 kB (169.8 kB unpacked)
+- **Test Coverage**: 24 passing tests
+- **License**: MIT License (c) 2025 ERSIN KOC
+
+### Documentation
+- README.md with comprehensive installation and usage instructions
+- AI_GUIDE.md with detailed AI provider setup
+- API reference for programmatic usage
+- CLI command reference
+- Security considerations and best practices
+
+---
+
+## Usage Examples
+
+### Basic Usage
+```bash
+# Install globally
+npm install -g gctm
+
+# Generate AI commit message in Turkish
+gctm ai-generate --language tr --style humorous
+
+# Change commit dates
+gctm redate --start "2023-01-01" --end "2023-01-30" --backup
+
+# Sanitize sensitive data
+gctm sanitize --patterns "apiKeys,email" --replacement "***REDACTED***"
+```
+
+### AI Configuration
+```bash
+# Configure OpenAI
+gctm ai-config --provider openai --model gpt-5-main --api-key "your-key"
+
+# Test AI connection
+gctm ai-config --test
+
+# Show configuration
+gctm ai-config --show
+```
+
+### Programmatic Usage
+```javascript
+const { GitCommitTimeMachine } = require('gctm');
+
+const gctm = new GitCommitTimeMachine();
+
+// Generate AI commit message
+const result = await gctm.generateAICommitMessage({
+  language: 'tr',
+  style: 'humorous'
+});
+
+// Edit commit dates
+await gctm.redateCommits({
+  startDate: '2023-01-01',
+  endDate: '2023-01-30',
+  createBackup: true
+});
+```
+
+---
+
+**Full Project Documentation**: https://github.com/ersinkoc/git-commit-time-machine
+
+**npm Package**: https://www.npmjs.com/package/gctm

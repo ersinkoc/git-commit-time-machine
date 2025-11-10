@@ -1,0 +1,96 @@
+{
+  "name": "gctm",
+  "version": "1.0.0",
+  "description": "🚀 Git Commit Time Machine - Comprehensive Git history manipulation tool with AI-powered commit message generation. Change commit dates, edit content, manage sensitive data, and generate creative commit messages using OpenAI, Anthropic, Google Gemini, and Local AI models.",
+  "main": "src/index.js",
+  "bin": {
+    "gctm": "./bin/gctm.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "config/",
+    "examples/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.js bin/**/*.js --quiet",
+    "lint:fix": "eslint src/**/*.js bin/**/*.js --fix",
+    "dev": "nodemon src/index.js",
+    "build": "echo 'Build complete - ready for publishing'",
+    "prepublishOnly": "npm run lint && npm run test",
+    "postpublish": "echo '🚀 Published to npm successfully!'",
+    "version:patch": "npm version patch -m 'Bump version to %s'",
+    "version:minor": "npm version minor -m 'Bump version to %s'",
+    "version:major": "npm version major -m 'Bump version to %s'",
+    "publish:beta": "npm publish --tag beta",
+    "publish:dry": "npm pack --dry-run"
+  },
+  "keywords": [
+    "git",
+    "commit",
+    "version-control",
+    "git-history",
+    "rewrite-history",
+    "date-manipulation",
+    "commit-message",
+    "ai",
+    "openai",
+    "anthropic",
+    "claude",
+    "gemini",
+    "ollama",
+    "cli",
+    "command-line",
+    "developer-tools",
+    "git-tools",
+    "commit-ai",
+    "git-automation",
+    "backup",
+    "sanitize",
+    "sensitive-data",
+    "api-key-management"
+  ],
+  "author": {
+    "name": "Ersin Koc",
+    "email": "ersinkoc@gmail.com",
+    "url": "https://github.com/ersinkoc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ersinkoc/git-commit-time-machine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ersinkoc/git-commit-time-machine/issues"
+  },
+  "homepage": "https://github.com/ersinkoc/git-commit-time-machine#readme",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^9.4.1",
+    "simple-git": "^3.15.1",
+    "inquirer": "^8.2.6",
+    "chalk": "^4.1.2",
+    "moment": "^2.29.4",
+    "fs-extra": "^11.1.0",
+    "dotenv": "^16.0.3",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "jest": "^29.3.1",
+    "eslint": "^8.28.0",
+    "nodemon": "^2.0.20"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "preferGlobal": true,
+  "publishConfig": {
+    "access": "public"
+  }
+}
