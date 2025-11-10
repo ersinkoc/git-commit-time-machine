@@ -67,8 +67,7 @@ class GitProcessor {
 
       return commits;
     } catch (error) {
-      console.error('Error in getCommits:', error);
-      logger.error(`Cannot get commit list: ${error.message}`);
+      logger.error(`Error in getCommits: ${error.message}`);
       throw new Error(`Cannot get commit list: ${error.message}`);
     }
   }
@@ -195,7 +194,7 @@ class GitProcessor {
 
       if (isLatestCommit) {
         // Use git commit --amend for latest commit
-        await this.git.commit([], '--amend', '-m', newMessage);
+        await this.git.raw(['commit', '--amend', '-m', newMessage]);
 
         return {
           success: true,

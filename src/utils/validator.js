@@ -181,7 +181,7 @@ class Validator {
     }
 
     if (options.commitId && !this.isValidGitHash(options.commitId)) {
-      errors.push('Geçerli bir commit hash\'i belirtilmeli');
+      errors.push('Valid commit hash must be specified');
     }
 
     if (options.newMessage && !this.isValidString(options.newMessage)) {
@@ -298,7 +298,7 @@ class Validator {
     }
 
     if (!options.patterns || !Array.isArray(options.patterns) || options.patterns.length === 0) {
-      errors.push('En az bir desen belirtilmeli');
+      errors.push('At least one pattern must be specified');
     }
 
     if (options.patterns) {

@@ -1,4 +1,4 @@
-const { execSync, spawn } = require('child_process');
+const { execSync, spawn, spawnSync } = require('child_process');
 const fs = require('fs-extra');
 const path = require('path');
 const logger = require('./utils/logger');
@@ -28,8 +28,8 @@ class GitHistoryRewriter {
         // Get current state
         this.originalBranch = await this.getCurrentBranch();
 
-        // Process commits from oldest to newest
-        const sortedCommits = commitsWithNewDates.reverse(); // Reverse to process oldest first
+        // Process commits from oldest to newest (create copy to avoid mutating input)
+        const sortedCommits = [...commitsWithNewDates].reverse(); // Reverse copy to process oldest first
 
         let processedCount = 0;
 
@@ -212,18 +212,23 @@ class GitHistoryRewriter {
         : replacement.pattern.source;
 
       try {
-        // Use git grep to find files containing the pattern
-        const output = execSync(`git grep -l "${pattern}"`, {
+        // Use spawnSync with args array to prevent command injection
+        const result = spawnSync('git', ['grep', '-l', pattern], {
           cwd: this.repoPath,
-          encoding: 'utf8'
+          encoding: 'utf8',
+          shell: false // Prevent shell interpretation
         });
 
-        output.split('\n').forEach(file => {
-          if (file.trim()) files.add(file.trim());
-        });
+        // git grep exits with code 1 if no matches (not an error)
+        if (result.status === 0 && result.stdout) {
+          result.stdout.split('\n').forEach(file => {
+            if (file.trim()) files.add(file.trim());
+          });
+        }
 
       } catch (error) {
-        // git grep exits with non-zero if no matches found, which is normal
+        // Handle actual errors
+        logger.warn(`Error searching for pattern: ${error.message}`);
       }
     }
 
