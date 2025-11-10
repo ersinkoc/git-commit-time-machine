@@ -1,0 +1,58 @@
+name: Auto Version Bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.title, '[release]')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Extract version type from PR title
+        id: version
+        run: |
+          if [[ "${{ github.event.pull_request.title }}" =~ \[release\][[:space:]]*([a-z]+) ]]; then
+            VERSION_TYPE="${BASH_REMATCH[1]}"
+            echo "type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version
+        run: |
+          case "${{ steps.version.outputs.type }}" in
+            "major"|"minor"|"patch")
+              npm version ${{ steps.version.outputs.type }} -m "Bump version to %s"
+              ;;
+            *)
+              npm version patch -m "Auto-bump version to %s"
+              ;;
+          esac
+
+      - name: Push version bump
+        run: git push origin main --follow-tags
+
+      - name: Trigger publish workflow
+        run: |
+          # The tag push will automatically trigger the publish workflow
+          echo "Version bump completed and pushed with tags"

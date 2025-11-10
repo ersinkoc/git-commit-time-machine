@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Publish to npm and GitHub Packages
 
 on:
   push:
@@ -8,20 +8,25 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           scope: ''
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -29,41 +34,66 @@ jobs:
       - name: Run linting
         run: npm run lint
 
+      - name: Run security audit
+        run: npm audit --audit-level=high
+
+      - name: Build package
+        run: npm run build
+
       - name: Publish to npm
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
+      - name: Publish to GitHub Packages
+        run: npm publish --registry https://npm.pkg.github.com
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            ## Changes in this release
-            - Git Commit Time Machine v1.0.0 - Initial Release
-            - AI-powered commit message generation with 12 language support
-            - Git history manipulation (dates, messages, content)
-            - Sensitive data sanitization and backup system
-            - Support for OpenAI, Anthropic, Google Gemini, and Local AI models
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            ## Installation
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## 🚀 Git Commit Time Machine ${{ github.ref_name }}
+
+            ### ✨ New Features
+            - **Working date manipulation!** - Sequential and random date assignment
+            - **SimpleDateRewriter** - 4x faster Git history processing
+            - **Randomize support** - CLI and interactive modes
+            - **Fixed date format** - Git-compatible YYYY-MM-DDTHH:mm:ss
+
+            ### 🔧 Improvements
+            - Enhanced backup system with automatic recovery
+            - Better error handling and logging
+            - Updated GitHub Pages workflow
+            - Performance: Process 33+ commits in 4 seconds
+
+            ### 📦 Installation
             ```bash
             npm install -g gctm
+            # or
+            npx gctm
             ```
 
-            ## Quick Start
+            ### 🎯 Quick Start
             ```bash
             # Generate AI commit message
             gctm ai-generate --language tr --style humorous
 
-            # Change commit dates
-            gctm redate --start "2023-01-01" --end "2023-01-30" --backup
+            # Redate commits sequentially
+            gctm redate --start "2024-01-01" --end "2024-01-31" --backup --preserve-order
 
-            # Sanitize sensitive data
-            gctm sanitize --patterns "apiKeys,email" --replacement "***REDACTED***"
+            # Redate with random dates
+            gctm redate --start "2024-01-01" --end "2024-01-31" --backup --randomize
             ```
+
+            ### 📚 Documentation
+            - [Full Documentation](https://github.com/ersinkoc/git-commit-time-machine#readme)
+            - [AI Integration Guide](./AI_GUIDE.md)
+            - [Examples](./examples/)
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
