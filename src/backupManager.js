@@ -95,7 +95,21 @@ class BackupManager {
         // Create stash
         try {
           await this.git.stash(['push', '-m', `GCTM Backup: ${backupId}`]);
-          backupMetadata.hasStash = true;
+          // Store the exact stash reference for reliable restoration
+          const stashList = await this.git.stash(['list']);
+          const stashLines = stashList.split('\n').filter(line => line.trim());
+          if (stashLines.length > 0) {
+            // The most recent stash is always stash@{0}
+            const stashMatch = stashLines[0].match(/^(stash@\{\d+\})/);
+            if (stashMatch) {
+              backupMetadata.stashRef = stashMatch[1];
+              backupMetadata.hasStash = true;
+            } else {
+              backupMetadata.hasStash = true;
+            }
+          } else {
+            backupMetadata.hasStash = true;
+          }
         } catch (error) {
           logger.warn('Could not create stash:', error.message);
           backupMetadata.hasStash = false;
@@ -214,15 +228,37 @@ class BackupManager {
       // Restore uncommitted changes
       if (metadata.hasStash) {
         try {
-          const stashes = await this.git.stash(['list']);
-          const targetStash = stashes.find(stash => stash.includes(backupId));
+          const stashList = await this.git.stash(['list']);
+          const stashLines = stashList.split('\n').filter(line => line.trim());
 
-          if (targetStash) {
-            const stashIndex = targetStash.match(/^stash@{(\d+)}/);
-            if (stashIndex) {
-              await this.git.stash(['pop', `stash@{${stashIndex[1]}}`]);
-              logger.info('Uncommitted changes restored');
+          let stashToRestore = null;
+
+          // Method 1: Try to find by exact stash reference (most reliable)
+          if (metadata.stashRef) {
+            const exactMatch = stashLines.find(line => line.startsWith(metadata.stashRef));
+            if (exactMatch) {
+              stashToRestore = metadata.stashRef;
+              logger.debug(`Found stash by exact reference: ${stashToRestore}`);
             }
+          }
+
+          // Method 2: Fallback to searching by backup ID in message
+          if (!stashToRestore) {
+            const messageMatch = stashLines.find(line => line.includes(`GCTM Backup: ${backupId}`));
+            if (messageMatch) {
+              const stashMatch = messageMatch.match(/^(stash@\{\d+\})/);
+              if (stashMatch) {
+                stashToRestore = stashMatch[1];
+                logger.debug(`Found stash by message search: ${stashToRestore}`);
+              }
+            }
+          }
+
+          if (stashToRestore) {
+            await this.git.stash(['pop', stashToRestore]);
+            logger.info('Uncommitted changes restored from stash');
+          } else {
+            logger.warn(`Could not find stash for backup: ${backupId}`);
           }
         } catch (error) {
           logger.warn('Could not restore stash:', error.message);

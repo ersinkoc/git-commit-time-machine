@@ -17,6 +17,7 @@ class AICommitAssistant {
     this.style = options.style || 'conventional'; // conventional, descriptive, minimal, humorous
     this.configPath = options.configPath || '.gctm-ai-config.json';
     this.customInstructions = options.customInstructions || '';
+    this.timeout = options.timeout || 60000; // Default 60 seconds, configurable for slow networks
   }
 
   /**
@@ -364,12 +365,22 @@ Provide 3 different options, numbered 1-3.`;
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: this.timeout
       });
+
+      // Validate response structure
+      if (!response.data || !response.data.choices || !Array.isArray(response.data.choices) || response.data.choices.length === 0) {
+        throw new Error('Invalid API response format: missing choices array');
+      }
+
+      const content = response.data.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('Invalid API response format: missing message content');
+      }
 
       return {
         success: true,
-        message: response.data.choices[0].message.content
+        message: content
       };
     } catch (error) {
       throw new Error(`OpenAI API error: ${error.response?.data?.error?.message || error.message}`);
@@ -427,12 +438,22 @@ Provide 3 different options, numbered 1-3.`;
           'Content-Type': 'application/json',
           'anthropic-version': '2023-06-01'
         },
-        timeout: 30000
+        timeout: this.timeout
       });
+
+      // Validate response structure
+      if (!response.data || !response.data.content || !Array.isArray(response.data.content) || response.data.content.length === 0) {
+        throw new Error('Invalid API response format: missing content array');
+      }
+
+      const text = response.data.content[0]?.text;
+      if (!text) {
+        throw new Error('Invalid API response format: missing text content');
+      }
 
       return {
         success: true,
-        message: response.data.content[0].text
+        message: text
       };
     } catch (error) {
       throw new Error(`Anthropic API error: ${error.response?.data?.error?.message || error.message}`);
@@ -496,13 +517,23 @@ Provide 3 different options, numbered 1-3.`;
           headers: {
             'Content-Type': 'application/json'
           },
-          timeout: 30000
+          timeout: this.timeout
         }
       );
 
+      // Validate response structure
+      if (!response.data || !response.data.candidates || !Array.isArray(response.data.candidates) || response.data.candidates.length === 0) {
+        throw new Error('Invalid API response format: missing candidates array');
+      }
+
+      const text = response.data.candidates[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        throw new Error('Invalid API response format: missing text content');
+      }
+
       return {
         success: true,
-        message: response.data.candidates[0].content.parts[0].text
+        message: text
       };
     } catch (error) {
       throw new Error(`Google Gemini API error: ${error.response?.data?.error?.message || error.message}`);
@@ -584,8 +615,13 @@ Provide 3 different options, numbered 1-3.`;
         headers: {
           'Content-Type': 'application/json'
         },
-        timeout: 60000
+        timeout: this.timeout
       });
+
+      // Validate response structure
+      if (!response.data || !response.data.response) {
+        throw new Error('Invalid API response format: missing response field');
+      }
 
       return {
         success: true,

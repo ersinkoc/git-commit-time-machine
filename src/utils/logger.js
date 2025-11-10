@@ -22,14 +22,32 @@ class Logger {
     // Current level
     this.currentLevel = this.levels[this.logLevel] || this.levels.info;
 
-    // Create log file
+    // Create log file synchronously to avoid async in constructor
     if (this.enableFileLogging) {
-      this.initializeLogFile();
+      this.initializeLogFileSync();
     }
   }
 
   /**
-   * Initializes log file
+   * Initializes log file synchronously (for constructor)
+   */
+  initializeLogFileSync() {
+    try {
+      const logDir = path.dirname(this.logFile);
+      fs.ensureDirSync(logDir);
+
+      // Add header
+      if (!fs.pathExistsSync(this.logFile)) {
+        const header = `# Git Commit Time Machine - Log File\n# Created: ${new Date().toISOString()}\n\n`;
+        fs.appendFileSync(this.logFile, header);
+      }
+    } catch (error) {
+      console.warn('Could not create log file:', error.message);
+    }
+  }
+
+  /**
+   * Initializes log file (async version for manual initialization)
    */
   async initializeLogFile() {
     try {
@@ -47,7 +65,24 @@ class Logger {
   }
 
   /**
-   * Writes to log file
+   * Writes to log file synchronously (prevents race conditions)
+   * @param {string} level - Log level
+   * @param {string} message - Log message
+   */
+  writeToFileSync(level, message) {
+    if (!this.enableFileLogging) return;
+
+    try {
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}\n`;
+      fs.appendFileSync(this.logFile, logEntry);
+    } catch (error) {
+      // Silently fail to avoid infinite loop if logger fails
+    }
+  }
+
+  /**
+   * Writes to log file (async version - kept for backward compatibility)
    * @param {string} level - Log level
    * @param {string} message - Log message
    */
@@ -101,8 +136,8 @@ class Logger {
     const formattedMessage = this.formatMessage(level, message);
     console.log(formattedMessage);
 
-    // Write to file
-    this.writeToFile(level, message);
+    // Write to file synchronously (prevents race conditions and data loss)
+    this.writeToFileSync(level, message);
   }
 
   /**
@@ -145,7 +180,7 @@ class Logger {
     const timestamp = new Date().toLocaleTimeString();
     const formattedMessage = `${chalk.green('[SUCCESS]')} ${chalk.gray(timestamp)} ${message}`;
     console.log(formattedMessage);
-    this.writeToFile('info', `SUCCESS: ${message}`);
+    this.writeToFileSync('info', `SUCCESS: ${message}`);
   }
 
   /**
@@ -157,7 +192,7 @@ class Logger {
     console.log(chalk.cyan(line));
     console.log(chalk.cyan(title));
     console.log(chalk.cyan(line));
-    this.writeToFile('info', `TITLE: ${title}`);
+    this.writeToFileSync('info', `TITLE: ${title}`);
   }
 
   /**
@@ -169,7 +204,7 @@ class Logger {
     console.log(chalk.magenta(line));
     console.log(chalk.magenta(title));
     console.log(chalk.magenta(line));
-    this.writeToFile('info', `SUBTITLE: ${title}`);
+    this.writeToFileSync('info', `SUBTITLE: ${title}`);
   }
 
   /**
@@ -188,7 +223,7 @@ class Logger {
       }
     });
 
-    this.writeToFile('info', `${title}: ${JSON.stringify(items)}`);
+    this.writeToFileSync('info', `${title}: ${JSON.stringify(items)}`);
   }
 
   /**
@@ -208,7 +243,7 @@ class Logger {
       `(${current}/${total}) ${chalk.gray(message)}`
     );
 
-    this.writeToFile('info', `PROGRESS: ${percentage}% (${current}/${total}) ${message}`);
+    this.writeToFileSync('info', `PROGRESS: ${percentage}% (${current}/${total}) ${message}`);
   }
 
   /**
@@ -236,7 +271,7 @@ class Logger {
 
     console.log('');
 
-    this.writeToFile('info', `${title}: ${JSON.stringify({ headers, rows })}`);
+    this.writeToFileSync('info', `${title}: ${JSON.stringify({ headers, rows })}`);
   }
 
   /**
@@ -251,7 +286,7 @@ class Logger {
    * @param {string} level - New log level
    */
   setLevel(level) {
-    if (this.levels.hasOwnProperty(level)) {
+    if (level in this.levels) {
       this.logLevel = level;
       this.currentLevel = this.levels[level];
       this.info(`Log level changed to: ${level}`);
