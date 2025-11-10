@@ -19,7 +19,7 @@ describe('GitCommitTimeMachine', () => {
     testRepoPath = await fs.mkdtemp(path.join(os.tmpdir(), 'gctm-test-'));
 
     // Create test repo
-    const { simpleGit } = require('simple-git');
+    const simpleGit = require('simple-git');
     const git = simpleGit({ baseDir: testRepoPath });
     await git.init();
     await git.addConfig('user.name', 'Test User');
