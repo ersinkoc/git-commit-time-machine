@@ -89,9 +89,10 @@ class ContentEditor {
             appliedReplacements.push({ type: 'string', pattern });
           }
         } else if (pattern instanceof RegExp) {
-          // Replace with regex
-          const regex = new RegExp(pattern, options.flags || 'g');
-          const matches = content.match(regex);
+          // Replace with regex - create new instance to avoid state mutation
+          const regex = new RegExp(pattern.source, pattern.flags || 'g');
+          const matchRegex = new RegExp(pattern.source, pattern.flags || 'g');
+          const matches = content.match(matchRegex);
           if (matches && matches.length > 0) {
             content = content.replace(regex, replacementText);
             changesMade = true;
@@ -281,7 +282,7 @@ class ContentEditor {
       // Clean email addresses
       if (hideEmails) {
         const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-        if (emailPattern.test(content)) {
+        if (content.match(emailPattern)) {
           content = content.replace(emailPattern, emailReplacement);
           sanitizedTypes.push('emails');
         }
@@ -290,7 +291,7 @@ class ContentEditor {
       // Clean phone numbers
       if (hidePhones) {
         const phonePattern = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
-        if (phonePattern.test(content)) {
+        if (content.match(phonePattern)) {
           content = content.replace(phonePattern, phoneReplacement);
           sanitizedTypes.push('phones');
         }
@@ -299,7 +300,7 @@ class ContentEditor {
       // Clean API keys
       if (hideApiKeys) {
         const apiKeyPattern = /([A-Z_]+_?(KEY|TOKEN|SECRET|PASSWORD|PASS|API_KEY|SECRET_KEY)=)([^\s\n]+)/g;
-        if (apiKeyPattern.test(content)) {
+        if (content.match(apiKeyPattern)) {
           content = content.replace(apiKeyPattern, `$1${apiKeyReplacement}`);
           sanitizedTypes.push('apiKeys');
         }
@@ -308,7 +309,7 @@ class ContentEditor {
       // Clean IP addresses
       if (hideIPs) {
         const ipPattern = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
-        if (ipPattern.test(content)) {
+        if (content.match(ipPattern)) {
           content = content.replace(ipPattern, ipReplacement);
           sanitizedTypes.push('ipAddresses');
         }
@@ -317,7 +318,7 @@ class ContentEditor {
       // Clean URLs
       if (hideUrls) {
         const urlPattern = /(https?:\/\/[^\s]+)/g;
-        if (urlPattern.test(content)) {
+        if (content.match(urlPattern)) {
           content = content.replace(urlPattern, urlReplacement);
           sanitizedTypes.push('urls');
         }

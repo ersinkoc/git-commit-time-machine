@@ -6,6 +6,7 @@ const chalk = require('chalk');
 const GitCommitTimeMachine = require('../src/index');
 const logger = require('../src/utils/logger');
 const Validator = require('../src/utils/validator');
+const packageJson = require('../package.json');
 
 const program = new Command();
 
@@ -13,7 +14,7 @@ const program = new Command();
 program
   .name('gctm')
   .description('Git Commit Time Machine - Tool for managing Git commit history')
-  .version('1.3.3');
+  .version(packageJson.version);
 
 /**
  * Helper function: Show error and exit
