@@ -5,12 +5,35 @@ const logger = require('./utils/logger');
 
 /**
  * Backup management class
+ * SECURITY: Includes validation to prevent path traversal attacks
  */
 class BackupManager {
   constructor(repoPath) {
     this.repoPath = repoPath;
     this.backupDir = path.join(repoPath, '.gctm-backups');
     this.git = simpleGit({ baseDir: repoPath });
+  }
+
+  /**
+   * Validate backup ID format to prevent path traversal
+   * @param {string} backupId - Backup ID to validate
+   * @returns {boolean} Whether backup ID is valid
+   */
+  isValidBackupId(backupId) {
+    // Backup IDs should be alphanumeric with hyphens only (e.g., backup-2025-01-01T12-00-00-abc123)
+    // Prevent path traversal attempts like "../../../etc/passwd"
+    if (!backupId || typeof backupId !== 'string') {
+      return false;
+    }
+
+    // Check format: starts with "backup-", contains only safe characters
+    const safePattern = /^backup-[\w\-]+$/;
+    return safePattern.test(backupId) &&
+           !backupId.includes('..') &&
+           !backupId.includes('/') &&
+           !backupId.includes('\\') &&
+           backupId.length > 7 && // At least "backup-" + something
+           backupId.length < 256; // Reasonable max length
   }
 
   /**
@@ -185,6 +208,14 @@ class BackupManager {
    */
   async restoreBackup(backupId, options = {}) {
     try {
+      // SECURITY: Validate backup ID to prevent path traversal
+      if (!this.isValidBackupId(backupId)) {
+        return {
+          success: false,
+          error: `Invalid backup ID format: ${backupId}`
+        };
+      }
+
       await this.ensureBackupDir();
 
       const backupPath = path.join(this.backupDir, backupId);
@@ -335,6 +366,14 @@ class BackupManager {
    */
   async deleteBackup(backupId) {
     try {
+      // SECURITY: Validate backup ID to prevent path traversal
+      if (!this.isValidBackupId(backupId)) {
+        return {
+          success: false,
+          error: `Invalid backup ID format: ${backupId}`
+        };
+      }
+
       await this.ensureBackupDir();
 
       const backupPath = path.join(this.backupDir, backupId);
@@ -443,6 +482,14 @@ class BackupManager {
    */
   async getBackupDetails(backupId) {
     try {
+      // SECURITY: Validate backup ID to prevent path traversal
+      if (!this.isValidBackupId(backupId)) {
+        return {
+          success: false,
+          error: `Invalid backup ID format: ${backupId}`
+        };
+      }
+
       const metadataPath = path.join(this.backupDir, `${backupId}.json`);
       const exists = await fs.pathExists(metadataPath);
 
