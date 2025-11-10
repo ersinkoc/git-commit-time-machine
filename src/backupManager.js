@@ -277,6 +277,10 @@ class BackupManager {
         }
       }
 
+      // BUG-NEW-006 fix: Track stash restoration status
+      let stashRestored = false;
+      let stashRestoreError = null;
+
       // Restore uncommitted changes
       if (metadata.hasStash) {
         try {
@@ -309,11 +313,14 @@ class BackupManager {
           if (stashToRestore) {
             await this.git.stash(['pop', stashToRestore]);
             logger.info('Uncommitted changes restored from stash');
+            stashRestored = true;
           } else {
-            logger.warn(`Could not find stash for backup: ${backupId}`);
+            stashRestoreError = `Could not find stash for backup: ${backupId}`;
+            logger.warn(stashRestoreError);
           }
         } catch (error) {
-          logger.warn('Could not restore stash:', error.message);
+          stashRestoreError = `Could not restore stash: ${error.message}`;
+          logger.warn(stashRestoreError);
         }
       }
 
@@ -341,12 +348,19 @@ class BackupManager {
         }
       }
 
-      logger.info(`Backup successfully restored: ${backupId}`);
+      // BUG-NEW-006 fix: Report warnings for partial restoration
+      const warnings = [];
+      if (metadata.hasStash && !stashRestored && stashRestoreError) {
+        warnings.push(stashRestoreError);
+      }
+
+      logger.info(`Backup successfully restored: ${backupId}${warnings.length > 0 ? ' (with warnings)' : ''}`);
 
       return {
         success: true,
         backupId,
         restoredTo: metadata.currentCommit,
+        warnings: warnings.length > 0 ? warnings : undefined,
         branch: metadata.currentBranch
       };
     } catch (error) {

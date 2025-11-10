@@ -337,8 +337,13 @@ class GitCommitTimeMachine {
       // Get current repository status
       const status = await this.gitProcessor.getStatus();
 
+      // BUG-NEW-014 fix: Add null check for git status
+      if (!status || typeof status !== 'object') {
+        throw new Error('Failed to get repository status');
+      }
+
       // Get changed files and diff
-      const changedFiles = [...status.staged, ...status.modified, ...status.created];
+      const changedFiles = [...(status.staged || []), ...(status.modified || []), ...(status.created || [])];
       let diff = '';
 
       try {
