@@ -59,6 +59,17 @@ class ContentEditor {
    */
   async editFile(filePath, replacements, context = '') {
     try {
+      // BUG-023 fix: Validate file path before operations
+      const Validator = require('./utils/validator');
+      if (!Validator.isValidPath(filePath)) {
+        logger.error(`Invalid file path: ${filePath}`);
+        return {
+          success: false,
+          file: filePath,
+          error: 'Invalid file path format'
+        };
+      }
+
       // Check if file exists
       const exists = await fs.pathExists(filePath);
       if (!exists) {
@@ -148,6 +159,16 @@ class ContentEditor {
    */
   async hideApiKeys(filePath, keysToHide = [], replacement = '***HIDDEN***') {
     try {
+      // BUG-023 fix: Validate file path
+      const Validator = require('./utils/validator');
+      if (!Validator.isValidPath(filePath)) {
+        return {
+          success: false,
+          file: filePath,
+          error: 'Invalid file path format'
+        };
+      }
+
       const exists = await fs.pathExists(filePath);
       if (!exists) {
         return {
@@ -266,6 +287,16 @@ class ContentEditor {
     } = options;
 
     try {
+      // BUG-023 fix: Validate file path
+      const Validator = require('./utils/validator');
+      if (!Validator.isValidPath(filePath)) {
+        return {
+          success: false,
+          file: filePath,
+          error: 'Invalid file path format'
+        };
+      }
+
       const exists = await fs.pathExists(filePath);
       if (!exists) {
         return {

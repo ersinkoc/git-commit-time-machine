@@ -33,6 +33,9 @@ class GitCommitTimeMachine {
     try {
       logger.info('Redating commits...');
 
+      // BUG-028 fix: Default createBackup to true for destructive operations
+      const createBackup = options.createBackup !== false; // Default true unless explicitly set to false
+
       // Validate date formats before proceeding (BUG-020 fix)
       const Validator = require('./utils/validator');
       const dateValidation = Validator.validateDateRange(options.startDate, options.endDate);
@@ -42,7 +45,7 @@ class GitCommitTimeMachine {
         return { success: false, error: errorMsg };
       }
 
-      if (options.createBackup) {
+      if (createBackup) {
         await this.backupManager.createBackup();
         logger.info('Backup created');
       }
@@ -111,7 +114,10 @@ class GitCommitTimeMachine {
     try {
       logger.info(`Editing commit message: ${options.commitId}`);
 
-      if (options.createBackup) {
+      // BUG-028 fix: Default createBackup to true for destructive operations
+      const createBackup = options.createBackup !== false;
+
+      if (createBackup) {
         await this.backupManager.createBackup();
         logger.info('Backup created');
       }
@@ -147,7 +153,10 @@ class GitCommitTimeMachine {
     try {
       logger.info(`Editing commit content: ${options.commitId}`);
 
-      if (options.createBackup) {
+      // BUG-028 fix: Default createBackup to true for destructive operations
+      const createBackup = options.createBackup !== false;
+
+      if (createBackup) {
         await this.backupManager.createBackup();
         logger.info('Backup created');
       }
@@ -185,7 +194,18 @@ class GitCommitTimeMachine {
     try {
       logger.info('Sanitizing history from sensitive data...');
 
-      if (options.createBackup) {
+      // BUG-027 fix: Validate patterns before processing
+      const Validator = require('./utils/validator');
+      if (!options.patterns || !Array.isArray(options.patterns) || options.patterns.length === 0) {
+        const errorMsg = 'At least one pattern must be specified for sanitization';
+        logger.error(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+
+      // BUG-028 fix: Default createBackup to true for destructive operations
+      const createBackup = options.createBackup !== false;
+
+      if (createBackup) {
         await this.backupManager.createBackup();
         logger.info('Backup created');
       }
@@ -210,6 +230,13 @@ class GitCommitTimeMachine {
             pattern,
             replacement: options.replacement
           }));
+
+          // Validate replacements array
+          const validation = Validator.validateReplacements(replacements);
+          if (!validation.isValid) {
+            logger.warn(`Invalid replacements for commit ${commit.hash}: ${validation.errors.join(', ')}`);
+            continue;
+          }
 
           const result = await this.contentEditor.editCommit(
             commit.hash,
