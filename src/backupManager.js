@@ -238,9 +238,10 @@ class BackupManager {
       logger.info(`Restoring backup: ${backupId}`);
 
       // BUG-016 fix: Check for uncommitted changes before dangerous operations
+      // BUG-NEW-011 fix: Check success status from getStatus
       if (!options.skipClean && !options.force) {
         const status = await this.git.status();
-        if (!status.isClean()) {
+        if (status.success !== false && !status.isClean()) {
           const uncommittedFiles = [
             ...status.modified,
             ...status.created,
@@ -311,9 +312,27 @@ class BackupManager {
           }
 
           if (stashToRestore) {
-            await this.git.stash(['pop', stashToRestore]);
-            logger.info('Uncommitted changes restored from stash');
-            stashRestored = true;
+            // BUG-NEW-007 fix: Detect and handle stash conflicts
+            try {
+              await this.git.stash(['pop', stashToRestore]);
+              logger.info('Uncommitted changes restored from stash');
+              stashRestored = true;
+            } catch (popError) {
+              // Check if error is due to conflicts
+              if (popError.message && (popError.message.includes('CONFLICT') || popError.message.includes('conflict'))) {
+                stashRestoreError = `Stash restoration encountered merge conflicts.\n` +
+                  `Please resolve conflicts manually:\n` +
+                  `  1. Fix conflicts in affected files\n` +
+                  `  2. Run: git add <resolved-files>\n` +
+                  `  3. Run: git stash drop ${stashToRestore}\n` +
+                  `Stash ref for manual recovery: ${stashToRestore}`;
+                logger.error('Stash restoration failed due to conflicts');
+                logger.info(stashRestoreError);
+              } else {
+                stashRestoreError = `Could not restore stash: ${popError.message}`;
+                logger.warn(stashRestoreError);
+              }
+            }
           } else {
             stashRestoreError = `Could not find stash for backup: ${backupId}`;
             logger.warn(stashRestoreError);

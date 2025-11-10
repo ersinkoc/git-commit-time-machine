@@ -96,11 +96,12 @@ program
           showErrorAndExit(validation.errors.join(', '));
         }
 
+        // BUG-NEW-002 fix: Default backup to true (consistent with main API)
         redateOptions = {
           startDate: options.start,
           endDate: options.end,
-          createBackup: options.backup || false,
-          preserveOrder: options.preserveOrder || false
+          createBackup: options.backup !== false,
+          preserveOrder: options.preserveOrder !== false
         };
       }
 
@@ -187,10 +188,11 @@ program
           showErrorAndExit('Please specify a valid commit hash');
         }
 
+        // BUG-NEW-002 fix: Default backup to true
         editOptions = {
           commitId: options.commit,
           newMessage: options.message,
-          createBackup: options.backup || false
+          createBackup: options.backup !== false
         };
       }
 
@@ -289,13 +291,14 @@ program
           showErrorAndExit('Please specify a valid commit hash');
         }
 
+        // BUG-NEW-002 fix: Default backup to true
         editOptions = {
           commitId: options.commit,
           replacements: [{
             pattern: options.pattern,
             replacement: options.replacement
           }],
-          createBackup: options.backup || false
+          createBackup: options.backup !== false
         };
       }
 
@@ -404,10 +407,11 @@ program
         }
 
         const patterns = options.patterns.split(',').map(p => p.trim());
+        // BUG-NEW-002 fix: Default backup to true
         sanitizeOptions = {
           patterns,
           replacement: options.replacement,
-          createBackup: options.backup || false
+          createBackup: options.backup !== false
         };
       }
 
@@ -504,7 +508,11 @@ program
           }
         }
       } else if (options.apply) {
+        // BUG-NEW-013 fix: Validate parseInt result before using
         const applyIndex = parseInt(options.apply) - 1;
+        if (isNaN(applyIndex)) {
+          showErrorAndExit(`Invalid suggestion number: ${options.apply}. Must be a number.`);
+        }
         if (applyIndex >= 0 && applyIndex < result.suggestions.length) {
           const selectedSuggestion = result.suggestions[applyIndex];
           const applyResult = await gctm.applyAICommitMessage(selectedSuggestion, true);

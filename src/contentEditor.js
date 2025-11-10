@@ -146,10 +146,12 @@ class ContentEditor {
           }
         } else if (pattern instanceof RegExp) {
           // Replace with regex - create new instance to avoid state mutation
+          // BUG-NEW-003 fix: Reuse regex instance instead of creating duplicate
           const regex = new RegExp(pattern.source, pattern.flags || 'g');
-          const matchRegex = new RegExp(pattern.source, pattern.flags || 'g');
-          const matches = content.match(matchRegex);
+          const matches = content.match(regex);
           if (matches && matches.length > 0) {
+            // Reset lastIndex if global flag is set
+            regex.lastIndex = 0;
             content = content.replace(regex, replacementText);
             changesMade = true;
             appliedReplacements.push({
