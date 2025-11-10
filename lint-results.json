@@ -1,0 +1,5 @@
+
+> gctm@1.0.2 lint
+> eslint src/**/*.js bin/**/*.js --quiet --format=json
+
+[]
