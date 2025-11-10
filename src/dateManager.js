@@ -60,8 +60,9 @@ class DateManager {
 
     if (preserveOrder) {
       // Generate ordered dates
+      // BUG-NEW-005 fix: Handle count=1 case to place date in middle of range
       for (let i = 0; i < count; i++) {
-        const progress = i / Math.max(count - 1, 1);
+        const progress = count === 1 ? 0.5 : i / (count - 1);
         const minutes = Math.floor(totalMinutes * progress);
 
         let targetDate = moment(start).add(minutes, 'minutes');

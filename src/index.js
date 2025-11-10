@@ -337,9 +337,10 @@ class GitCommitTimeMachine {
       // Get current repository status
       const status = await this.gitProcessor.getStatus();
 
+      // BUG-NEW-011 fix: Check success status
       // BUG-NEW-014 fix: Add null check for git status
-      if (!status || typeof status !== 'object') {
-        throw new Error('Failed to get repository status');
+      if (!status || typeof status !== 'object' || !status.success) {
+        throw new Error(status?.error || 'Failed to get repository status');
       }
 
       // Get changed files and diff
@@ -403,7 +404,8 @@ class GitCommitTimeMachine {
 
       // Stage all changes if needed
       const status = await this.gitProcessor.getStatus();
-      if (status.modified.length > 0 || status.created.length > 0) {
+      // BUG-NEW-011 fix: Check success status
+      if (status.success && (status.modified.length > 0 || status.created.length > 0)) {
         logger.info('Staging all changes...');
         // This would require adding git add functionality to GitProcessor
         logger.warn('Manual staging required - please run "git add ." before committing');
