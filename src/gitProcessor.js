@@ -6,11 +6,18 @@ const GitHistoryRewriter = require('./gitHistoryRewriter');
 
 /**
  * Class for interacting with Git repository
+ * BUG-NEW-039 fix: Added timeout handling for git operations
  */
 class GitProcessor {
   constructor(repoPath) {
     this.repoPath = repoPath;
-    this.git = simpleGit({ baseDir: repoPath });
+    // BUG-NEW-039 fix: Add timeout to prevent hung operations
+    this.git = simpleGit({
+      baseDir: repoPath,
+      timeout: {
+        block: 60000 // 60 second timeout for blocking operations
+      }
+    });
     this.historyRewriter = new GitHistoryRewriter(repoPath);
   }
 
