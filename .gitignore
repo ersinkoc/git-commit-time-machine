@@ -1,9 +1,57 @@
-node_modules/
-test-repo/
-# Keep package-lock.json for CI/CD
-# package-lock.json
+# BUG-038 fix: Enhanced .gitignore for Node.js project
 
-# Generated log files
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Test directories
+test-repo/
+test-results/
+coverage/
+.nyc_output/
+
+# Logs
+*.log
 .gctm-logs.txt
+logs/
+
+# Build outputs
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.test
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+.history/
+
+# Operating System
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# GCTM Specific
 .gctm-backups/
+.gctm-temp-*
 .gctm-ai-config.json
+
+# Optional cache
+.npm
+.eslintcache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
