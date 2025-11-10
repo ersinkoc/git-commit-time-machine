@@ -104,13 +104,14 @@ class ContentEditor {
    */
   async editFile(filePath, replacements, context = '') {
     try {
-      // SECURITY: Validate the file path is safe
-      if (!this.isPathSafe(filePath)) {
-        logger.error(`Path traversal attempt detected: ${filePath}`);
+      // BUG-023 fix: Validate file path before operations
+      const Validator = require('./utils/validator');
+      if (!Validator.isValidPath(filePath)) {
+        logger.error(`Invalid file path: ${filePath}`);
         return {
           success: false,
           file: filePath,
-          error: 'Path traversal attempt detected'
+          error: 'Invalid file path format'
         };
       }
 
@@ -203,6 +204,16 @@ class ContentEditor {
    */
   async hideApiKeys(filePath, keysToHide = [], replacement = '***HIDDEN***') {
     try {
+      // BUG-023 fix: Validate file path
+      const Validator = require('./utils/validator');
+      if (!Validator.isValidPath(filePath)) {
+        return {
+          success: false,
+          file: filePath,
+          error: 'Invalid file path format'
+        };
+      }
+
       const exists = await fs.pathExists(filePath);
       if (!exists) {
         return {
@@ -325,6 +336,16 @@ class ContentEditor {
     } = options;
 
     try {
+      // BUG-023 fix: Validate file path
+      const Validator = require('./utils/validator');
+      if (!Validator.isValidPath(filePath)) {
+        return {
+          success: false,
+          file: filePath,
+          error: 'Invalid file path format'
+        };
+      }
+
       const exists = await fs.pathExists(filePath);
       if (!exists) {
         return {
