@@ -79,7 +79,14 @@ class GitProcessor {
    */
   async getCommitDiff(commitHash) {
     try {
-      const diff = await this.git.diff([`${commitHash}^`, commitHash]);
+      let diff;
+      try {
+        // Try normal diff (with parent commit)
+        diff = await this.git.diff([`${commitHash}^`, commitHash]);
+      } catch (error) {
+        // For initial commit, use empty tree hash as parent
+        diff = await this.git.diff(['4b825dc642cb6eb9a060e54bf8d69288fbee4904', commitHash]);
+      }
       return {
         hash: commitHash,
         diff
@@ -97,14 +104,14 @@ class GitProcessor {
    */
   async getCommitFiles(commitHash) {
     try {
-      // For initial commitial commit, use empty tree as parent
+      // For initial commit, use empty tree as parent
       const parentCommit = commitHash + '^';
       let diffSummary;
 
       try {
         diffSummary = await this.git.diffSummary([parentCommit, commitHash]);
       } catch (error) {
-        // If it's the initial commitial commit, show all files
+        // If it's the initial commit, show all files
         diffSummary = await this.git.diffSummary(['4b825dc642cb6eb9a060e54bf8d69288fbee4904', commitHash]);
       }
 
