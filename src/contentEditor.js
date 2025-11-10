@@ -4,10 +4,45 @@ const logger = require('./utils/logger');
 
 /**
  * Class used for editing commit contents
+ * SECURITY: Includes path validation to prevent directory traversal attacks
  */
 class ContentEditor {
   constructor(repoPath) {
-    this.repoPath = repoPath;
+    this.repoPath = path.resolve(repoPath); // Normalize repository path
+  }
+
+  /**
+   * Validate that a file path is within the repository (prevent path traversal)
+   * @param {string} filePath - File path to validate
+   * @returns {boolean} Whether the path is safe
+   */
+  isPathSafe(filePath) {
+    try {
+      const resolvedPath = path.resolve(filePath);
+      const resolvedRepo = path.resolve(this.repoPath);
+
+      // Check if the resolved path starts with the repository path
+      return resolvedPath.startsWith(resolvedRepo + path.sep) || resolvedPath === resolvedRepo;
+    } catch (error) {
+      logger.warn(`Path validation error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Safely join and validate a path within the repository
+   * @param {string} relativePath - Relative path within repository
+   * @returns {string} Safe absolute path
+   * @throws {Error} If path is outside repository
+   */
+  safePath(relativePath) {
+    const fullPath = path.join(this.repoPath, relativePath);
+
+    if (!this.isPathSafe(fullPath)) {
+      throw new Error(`Path traversal attempt detected: ${relativePath}`);
+    }
+
+    return fullPath;
   }
 
   /**
@@ -26,9 +61,19 @@ class ContentEditor {
 
       // Apply changes for each file
       for (const file of changedFiles) {
-        const filePath = path.join(this.repoPath, file.file);
-        const result = await this.editFile(filePath, replacements, commitHash);
-        results.push(result);
+        try {
+          // SECURITY: Validate path is within repository
+          const filePath = this.safePath(file.file);
+          const result = await this.editFile(filePath, replacements, commitHash);
+          results.push(result);
+        } catch (error) {
+          logger.warn(`Skipping unsafe file path: ${file.file}`);
+          results.push({
+            success: false,
+            file: file.file,
+            error: 'Path traversal attempt detected'
+          });
+        }
       }
 
       const successful = results.filter(r => r.success).length;
@@ -52,13 +97,23 @@ class ContentEditor {
 
   /**
    * Edits a specific file
-   * @param {string} filePath - File path
+   * @param {string} filePath - File path (must be absolute or will be validated)
    * @param {Array} replacements - Patterns to replace and their replacements
    * @param {string} context - Operation context (for logging)
    * @returns {Promise<Object>} Operation result
    */
   async editFile(filePath, replacements, context = '') {
     try {
+      // SECURITY: Validate the file path is safe
+      if (!this.isPathSafe(filePath)) {
+        logger.error(`Path traversal attempt detected: ${filePath}`);
+        return {
+          success: false,
+          file: filePath,
+          error: 'Path traversal attempt detected'
+        };
+      }
+
       // Check if file exists
       const exists = await fs.pathExists(filePath);
       if (!exists) {
@@ -163,9 +218,13 @@ class ContentEditor {
 
       // Hide each API key
       for (const key of keysToHide) {
+        // BUGFIX (BUG-022): Don't use test() before replace() as it mutates regex state
+        // Instead, just do the replace and check if content changed
         const pattern = new RegExp(`(${key}=)([^\\n\\r]+)`, 'gi');
-        if (pattern.test(content)) {
-          content = content.replace(pattern, `$1${replacement}`);
+        const newContent = content.replace(pattern, `$1${replacement}`);
+
+        if (newContent !== content) {
+          content = newContent;
           hiddenKeys.push(key);
         }
       }
