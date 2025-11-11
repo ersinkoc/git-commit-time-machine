@@ -83,6 +83,8 @@ class Logger {
 
   /**
    * Writes to log file (async version - kept for backward compatibility)
+   * BUG-NEW-009 fix: Deprecated in favor of writeToFileSync to avoid race conditions
+   * @deprecated Use writeToFileSync instead to prevent race conditions
    * @param {string} level - Log level
    * @param {string} message - Log message
    */

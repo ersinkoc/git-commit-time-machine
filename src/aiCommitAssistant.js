@@ -643,9 +643,10 @@ Provide 3 different options, numbered 1-3.`;
         throw new Error('Invalid API response format: missing choices array');
       }
 
+      // BUG-NEW-012 fix: Check for empty content
       const content = response.data.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error('Invalid API response format: missing message content');
+      if (!content || content.trim().length === 0) {
+        throw new Error('Invalid API response format: empty message content');
       }
 
       return {
@@ -719,9 +720,10 @@ Provide 3 different options, numbered 1-3.`;
         throw new Error('Invalid API response format: missing content array');
       }
 
+      // BUG-NEW-012 fix: Check for empty content
       const text = response.data.content[0]?.text;
-      if (!text) {
-        throw new Error('Invalid API response format: missing text content');
+      if (!text || text.trim().length === 0) {
+        throw new Error('Invalid API response format: empty text content');
       }
 
       return {
@@ -803,9 +805,10 @@ Provide 3 different options, numbered 1-3.`;
         throw new Error('Invalid API response format: missing candidates array');
       }
 
+      // BUG-NEW-012 fix: Check for empty content
       const text = response.data.candidates[0]?.content?.parts?.[0]?.text;
-      if (!text) {
-        throw new Error('Invalid API response format: missing text content');
+      if (!text || text.trim().length === 0) {
+        throw new Error('Invalid API response format: empty text content');
       }
 
       return {
@@ -980,12 +983,15 @@ Provide 3 different options, numbered 1-3.`;
 
   /**
    * Update configuration
+   * BUG-NEW-001 fix: Validate config before assignment to prevent invalid config injection
    * @param {Object} newConfig - New configuration options
    * @returns {Promise<Object>} Update result
    */
   async updateConfig(newConfig) {
     try {
-      Object.assign(this, newConfig);
+      // BUG-NEW-001 fix: Validate configuration before applying
+      const validatedConfig = this.validateConfigSchema(newConfig);
+      Object.assign(this, validatedConfig);
       await this.saveConfig();
       logger.info('AI configuration updated');
       return { success: true };
