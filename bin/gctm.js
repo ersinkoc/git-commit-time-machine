@@ -584,7 +584,14 @@ program
       if (options.model) configUpdate.model = options.model;
       if (options.language) configUpdate.language = options.language;
       if (options.style) configUpdate.style = options.style;
-      if (options.temperature) configUpdate.temperature = parseFloat(options.temperature);
+      // BUG-NEW-034 fix: Validate parseFloat result before assignment
+      if (options.temperature) {
+        const temp = parseFloat(options.temperature);
+        if (isNaN(temp) || temp < 0 || temp > 2) {
+          showErrorAndExit('Temperature must be a number between 0 and 2');
+        }
+        configUpdate.temperature = temp;
+      }
 
       if (Object.keys(configUpdate).length > 0) {
         const result = await gctm.updateAIConfig(configUpdate);

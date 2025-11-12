@@ -31,12 +31,21 @@ class ContentEditor {
 
   /**
    * Safely join and validate a path within the repository
+   * BUG-NEW-038 fix: Enhanced path validation with normalization to prevent Windows-specific bypasses
    * @param {string} relativePath - Relative path within repository
    * @returns {string} Safe absolute path
    * @throws {Error} If path is outside repository
    */
   safePath(relativePath) {
-    const fullPath = path.join(this.repoPath, relativePath);
+    // BUG-NEW-038 fix: Normalize path to prevent bypass via mixed separators
+    const normalized = path.normalize(relativePath);
+
+    // BUG-NEW-038 fix: Reject paths that try to escape via ../
+    if (normalized.includes('..')) {
+      throw new Error(`Path traversal attempt detected: ${relativePath}`);
+    }
+
+    const fullPath = path.resolve(this.repoPath, normalized);
 
     if (!this.isPathSafe(fullPath)) {
       throw new Error(`Path traversal attempt detected: ${relativePath}`);

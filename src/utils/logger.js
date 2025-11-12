@@ -82,22 +82,16 @@ class Logger {
   }
 
   /**
-   * Writes to log file (async version - kept for backward compatibility)
+   * Writes to log file (async version - DEPRECATED)
    * BUG-NEW-009 fix: Deprecated in favor of writeToFileSync to avoid race conditions
+   * BUG-NEW-040 fix: Throw error instead of silent deprecation
    * @deprecated Use writeToFileSync instead to prevent race conditions
+   * @throws {Error} Always throws - method is deprecated
    * @param {string} level - Log level
    * @param {string} message - Log message
    */
   async writeToFile(level, message) {
-    if (!this.enableFileLogging) return;
-
-    try {
-      const timestamp = new Date().toISOString();
-      const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}\n`;
-      await fs.appendFile(this.logFile, logEntry);
-    } catch (error) {
-      console.warn('Could not write to log file:', error.message);
-    }
+    throw new Error('writeToFile() is deprecated. Use writeToFileSync() instead to prevent race conditions.');
   }
 
   /**
