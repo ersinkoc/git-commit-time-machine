@@ -165,21 +165,63 @@ class GitHistoryRewriter {
 
   /**
    * Build the date filter script for git filter-branch
+   * Uses environment file approach to avoid Windows Git bash quote escaping issues
    * @param {Object} hashDateMap - Mapping of commit hash to new date
    * @returns {string} Shell script for env filter
    */
   buildDateFilterScript(hashDateMap) {
-    // Convert mapping to shell case statement - use environment variable approach
+    // Create a temporary environment file with all the date mappings
+    const tempEnvFile = path.join(this.repoPath, '.gctm-date-env-' + Date.now());
+
+    try {
+      // Create environment file with simple format: HASH=DATE
+      const envContent = Object.entries(hashDateMap)
+        .map(([hash, date]) => `${hash}=${date}`)
+        .join('\n');
+
+      fs.writeFileSync(tempEnvFile, envContent, 'utf8');
+
+      logger.debug(`Created environment file with ${Object.keys(hashDateMap).length} date mappings`);
+
+    } catch (error) {
+      logger.warn(`Failed to create environment file: ${error.message}`);
+      // Fallback to simple case statement without complex quotes
+      return this.buildSimpleCaseStatement(hashDateMap);
+    }
+
+    // Return a shell script that sources the environment file
+    return `#!/bin/sh
+# Date filter for Git filter-branch - Environment file approach
+# Load date mappings from environment file
+if [ -f "${tempEnvFile}" ]; then
+  # Read the environment file line by line
+  while IFS='=' read -r commit_hash new_date; do
+    if [ "$GIT_COMMIT" = "$commit_hash" ]; then
+      export GIT_AUTHOR_DATE="$new_date"
+      export GIT_COMMITTER_DATE="$new_date"
+      break
+    fi
+  done < "${tempEnvFile}"
+fi
+# Clean up environment file after use
+rm -f "${tempEnvFile}" 2>/dev/null || true`;
+  }
+
+  /**
+   * Build a simple case statement as fallback for environment file approach
+   * @param {Object} hashDateMap - Mapping of commit hash to new date
+   * @returns {string} Simple shell script for env filter
+   */
+  buildSimpleCaseStatement(hashDateMap) {
+    // Use minimal quoting and simple syntax for Windows Git bash compatibility
     const caseEntries = Object.entries(hashDateMap).map(([hash, date]) => {
-      return `  ${hash}) export GIT_AUTHOR_DATE='${date}' export GIT_COMMITTER_DATE='${date}';;`;
+      return `    ${hash}) GIT_AUTHOR_DATE=${date} GIT_COMMITTER_DATE=${date} ;;`;
     });
 
     return `#!/bin/sh
-# Date filter for Git filter-branch
-# Match commit hashes and set corresponding dates
-case "$GIT_COMMIT" in
-${caseEntries.join('\n')}
-  *) ;;
+# Simple date filter for Git filter-branch
+case "$GIT_COMMIT" in${caseEntries.join('\n')}
+    *) ;;
 esac`;
   }
 
