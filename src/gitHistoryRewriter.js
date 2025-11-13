@@ -169,24 +169,18 @@ class GitHistoryRewriter {
    * @returns {string} Shell script for env filter
    */
   buildDateFilterScript(hashDateMap) {
-    // Convert mapping to shell case statement - use simple quotes for Windows compatibility
+    // Convert mapping to shell case statement - use environment variable approach
     const caseEntries = Object.entries(hashDateMap).map(([hash, date]) => {
-      // Remove any problematic characters and use a safer approach
-      return `  "${hash}")
-    GIT_AUTHOR_DATE='${date}'
-    GIT_COMMITTER_DATE='${date}'
-    ;;`;
+      return `  ${hash}) export GIT_AUTHOR_DATE='${date}' export GIT_COMMITTER_DATE='${date}';;`;
     });
 
-    return `
+    return `#!/bin/sh
 # Date filter for Git filter-branch
 # Match commit hashes and set corresponding dates
 case "$GIT_COMMIT" in
 ${caseEntries.join('\n')}
-  *) # Default: keep original dates
-     ;;
-esac
-`;
+  *) ;;
+esac`;
   }
 
   /**
