@@ -461,12 +461,23 @@ class BackupManager {
     try {
       const { keepCount = 10, maxAge = 30 } = options;
 
+      // Validate inputs
+      if (typeof maxAge !== 'number' || maxAge < 0) {
+        return {
+          success: false,
+          message: 'Invalid max age format. Must be a positive number representing days.',
+          deleted: 0,
+          errors: 1
+        };
+      }
+
       const backups = await this.listBackups();
       if (backups.length <= keepCount) {
         return {
           success: true,
           message: 'No backups to clean up',
-          deleted: 0
+          deleted: 0,
+          errors: 0
         };
       }
 

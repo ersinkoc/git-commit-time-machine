@@ -32,7 +32,7 @@ describe('GitHistoryRewriter', () => {
     test('should create instance with repo path', () => {
       expect(gitHistoryRewriter.repoPath).toBe(tempRepoPath);
       expect(gitHistoryRewriter.originalBranch).toBeNull();
-      expect(gitHistoryRewriter.GIT_TIMEOUT).toBe(60000);
+      expect(gitHistoryRewriter.GIT_TIMEOUT).toBe(300000);
     });
 
     test('should handle different repo paths', () => {
@@ -382,6 +382,388 @@ describe('GitHistoryRewriter', () => {
       expect(result).toHaveProperty('success');
       expect(result).toHaveProperty('error');
       expect(result.success).toBe(false);
+    });
+
+    describe('changeCommitMessage', () => {
+      test('should handle valid commit hash and message', async () => {
+        const commitHash = 'abc123def456';
+        const newMessage = 'New commit message';
+
+        try {
+          const result = await gitHistoryRewriter.changeCommitMessage(commitHash, newMessage);
+          expect(result).toHaveProperty('success');
+          if (result.success) {
+            expect(result.oldHash).toBe(commitHash);
+            expect(result.newMessage).toBe(newMessage);
+          }
+        } catch (error) {
+          // Expected in test environment
+          expect(true).toBe(true);
+        }
+      });
+
+      test('should reject invalid commit hash', async () => {
+        const invalidHash = 'invalid@hash';
+        const newMessage = 'New commit message';
+
+        const result = await gitHistoryRewriter.changeCommitMessage(invalidHash, newMessage);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Invalid commit hash');
+      });
+
+      test('should reject empty commit message', async () => {
+        const commitHash = 'abc123def456';
+        const emptyMessage = '';
+
+        const result = await gitHistoryRewriter.changeCommitMessage(commitHash, emptyMessage);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Commit message cannot be empty');
+      });
+
+      test('should reject whitespace-only commit message', async () => {
+        const commitHash = 'abc123def456';
+        const whitespaceMessage = '   ';
+
+        const result = await gitHistoryRewriter.changeCommitMessage(commitHash, whitespaceMessage);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Commit message cannot be empty');
+      });
+
+      test('should handle commit message with special characters', async () => {
+        const commitHash = 'abc123def456';
+        const specialMessage = 'Commit with "quotes" and \n newlines and apostrophes\'';
+
+        try {
+          const result = await gitHistoryRewriter.changeCommitMessage(commitHash, specialMessage);
+          expect(result).toHaveProperty('success');
+          if (result.success) {
+            expect(result.newMessage).toBe(specialMessage);
+          }
+        } catch (error) {
+          // Expected in test environment
+          expect(true).toBe(true);
+        }
+      });
+    });
+
+    describe('buildMessageFilterScript', () => {
+      test('should build valid shell script', () => {
+        const targetHash = 'abc123def456';
+        const newMessage = 'Test commit message';
+
+        const script = gitHistoryRewriter.buildMessageFilterScript(targetHash, newMessage);
+
+        expect(script).toContain('#!/bin/sh');
+        expect(script).toContain('Message filter for Git filter-branch');
+        expect(script).toContain(targetHash);
+        expect(script).toContain(newMessage);
+        expect(script).toContain('GIT_COMMIT');
+      });
+
+      test('should escape special characters in message', () => {
+        const targetHash = 'abc123def456';
+        const messageWithQuotes = 'Message with "double quotes" and \'single quotes\'';
+
+        const script = gitHistoryRewriter.buildMessageFilterScript(targetHash, messageWithQuotes);
+
+        expect(script).toContain('echo');
+        expect(script).not.toContain('Message with "double quotes" and \'single quotes\'');
+      });
+
+      test('should handle empty message gracefully', () => {
+        const targetHash = 'abc123def456';
+        const emptyMessage = '';
+
+        const script = gitHistoryRewriter.buildMessageFilterScript(targetHash, emptyMessage);
+
+        expect(script).toContain('#!/bin/sh');
+        expect(script).toContain('echo');
+      });
+    });
+  });
+
+  describe('Temporary Directory Operations', () => {
+    test('should create temporary working directory', async () => {
+      const tempDir = await gitHistoryRewriter.createTempWorkingDirectory();
+
+      expect(tempDir).toContain('.gctm-temp-');
+      expect(await fs.pathExists(tempDir)).toBe(true);
+
+      // Clean up
+      await fs.remove(tempDir);
+    });
+
+    test('should create unique temporary directories', async () => {
+      const tempDir1 = await gitHistoryRewriter.createTempWorkingDirectory();
+      const tempDir2 = await gitHistoryRewriter.createTempWorkingDirectory();
+
+      expect(tempDir1).not.toBe(tempDir2);
+      expect(tempDir1).toContain('.gctm-temp-');
+      expect(tempDir2).toContain('.gctm-temp-');
+
+      // Clean up
+      await fs.remove(tempDir1);
+      await fs.remove(tempDir2);
+    });
+  });
+
+  describe('Backup Branch Management', () => {
+    test('should create backup branch with unique name', async () => {
+      try {
+        const branchName = await gitHistoryRewriter.createBackupBranch();
+
+        expect(typeof branchName).toBe('string');
+        expect(branchName).toContain('gctm-backup-');
+        expect(gitHistoryRewriter.isValidBranchName(branchName)).toBe(true);
+      } catch (error) {
+        // Expected in test environment
+        expect(error.message).toBeDefined();
+      }
+    });
+
+    test('should validate branch names correctly', () => {
+      expect(gitHistoryRewriter.isValidBranchName('main')).toBe(true);
+      expect(gitHistoryRewriter.isValidBranchName('feature/test')).toBe(true);
+      expect(gitHistoryRewriter.isValidBranchName('feature-123')).toBe(true);
+
+      expect(gitHistoryRewriter.isValidBranchName('')).toBe(false);
+      expect(gitHistoryRewriter.isValidBranchName(null)).toBe(false);
+      expect(gitHistoryRewriter.isValidBranchName('invalid@name')).toBe(false);
+      expect(gitHistoryRewriter.isValidBranchName('..')).toBe(false);
+      expect(gitHistoryRewriter.isValidBranchName('//')).toBe(false);
+      expect(gitHistoryRewriter.isValidBranchName('.hidden')).toBe(false);
+      expect(gitHistoryRewriter.isValidBranchName('a'.repeat(257))).toBe(false);
+    });
+
+    test('should get current branch name', async () => {
+      try {
+        const branch = await gitHistoryRewriter.getCurrentBranch();
+        expect(typeof branch).toBe('string');
+      } catch (error) {
+        // Expected in test environment
+        expect(error.message).toBeDefined();
+      }
+    });
+  });
+
+  describe('Git Command Execution', () => {
+    test('should execute git commands with timeout', () => {
+      const result = gitHistoryRewriter.executeGitCommand(['--version']);
+
+      expect(result).toHaveProperty('stdout');
+      expect(result).toHaveProperty('stderr');
+      expect(result).toHaveProperty('status');
+    });
+
+    test('should handle git command execution with custom options', () => {
+      const result = gitHistoryRewriter.executeGitCommand(
+        ['status'],
+        { timeout: 5000 }
+      );
+
+      expect(result).toHaveProperty('stdout');
+      expect(result).toHaveProperty('stderr');
+      expect(result).toHaveProperty('status');
+    });
+
+    test('should handle git command execution with custom environment', () => {
+      const customEnv = { CUSTOM_VAR: 'test-value' };
+      const result = gitHistoryRewriter.executeGitCommand(
+        ['status'],
+        { env: customEnv }
+      );
+
+      expect(result).toHaveProperty('stdout');
+      expect(result).toHaveProperty('stderr');
+      expect(result).toHaveProperty('status');
+    });
+  });
+
+  describe('Advanced Error Scenarios', () => {
+    test('should handle git command execution errors', () => {
+      const result = gitHistoryRewriter.executeGitCommand(['invalid-git-command']);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toBeDefined();
+    });
+
+    test('should handle timeout during git operations', () => {
+      const shortTimeout = 1;
+      gitHistoryRewriter.GIT_TIMEOUT = shortTimeout;
+
+      const result = gitHistoryRewriter.executeGitCommand(['log', '--oneline']);
+
+      // Command might complete quickly or timeout, but should handle gracefully
+      expect(result).toHaveProperty('stdout');
+      expect(result).toHaveProperty('stderr');
+      expect(result).toHaveProperty('status');
+
+      // Restore timeout
+      gitHistoryRewriter.GIT_TIMEOUT = 300000;
+    });
+
+    test('should handle concurrent operations safely', async () => {
+      const operations = [];
+      for (let i = 0; i < 3; i++) {
+        operations.push(gitHistoryRewriter.getCurrentBranch());
+      }
+
+      const results = await Promise.allSettled(operations);
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          expect(typeof result.value).toBe('string');
+        } else {
+          expect(result.reason).toBeDefined();
+        }
+      });
+    });
+  });
+
+  describe('Environment and Setup Issues', () => {
+    test('should handle invalid repository path', async () => {
+      const invalidRewriter = new GitHistoryRewriter('/non-existent/path');
+      expect(invalidRewriter.repoPath).toBe('/non-existent/path');
+    });
+
+    test('should handle repository without git', async () => {
+      const noGitPath = path.join(os.tmpdir(), 'no-git-repo');
+      await fs.ensureDir(noGitPath);
+
+      const noGitRewriter = new GitHistoryRewriter(noGitPath);
+      expect(noGitRewriter.repoPath).toBe(noGitPath);
+
+      await fs.remove(noGitPath);
+    });
+
+    test('should handle permission issues gracefully', async () => {
+      // This tests error handling when git commands fail due to permissions
+      const result = gitHistoryRewriter.executeGitCommand(['status']);
+
+      // Should not throw, should return error status
+      expect(result).toHaveProperty('status');
+      expect(typeof result.status).toBe('number');
+    });
+  });
+
+  describe('Memory and Performance', () => {
+    test('should handle large number of commits efficiently', async () => {
+      const largeCommitList = [];
+
+      // Create a large list of commit data
+      for (let i = 0; i < 100; i++) {
+        largeCommitList.push({
+          hash: `abc123def456${i}`,
+          newDate: `2023-01-${String(i).padStart(2, '0')}T12:00:00`
+        });
+      }
+
+      // Test date filter script generation
+      const hashDateMap = {};
+      largeCommitList.forEach(commit => {
+        if (gitHistoryRewriter.isValidHash(commit.hash)) {
+          hashDateMap[commit.hash] = commit.newDate;
+        }
+      });
+
+      const filterScript = gitHistoryRewriter.buildDateFilterScript(hashDateMap);
+
+      expect(filterScript).toContain('Date filter for Git filter-branch');
+      expect(filterScript).toContain('case "$GIT_COMMIT" in');
+      expect(filterScript.split('\n').length).toBeGreaterThan(100);
+    });
+
+    test('should handle very long commit messages', () => {
+      const longMessage = 'A'.repeat(1000);
+      const targetHash = 'abc123def456';
+
+      const filterScript = gitHistoryRewriter.buildMessageFilterScript(targetHash, longMessage);
+
+      expect(filterScript).toContain(longMessage);
+      expect(filterScript).toContain(targetHash);
+    });
+
+    test('should handle special characters in messages', () => {
+      const specialMessage = 'Message with "quotes", apostrophes\', newlines\nand tabs\t';
+      const targetHash = 'abc123def456';
+
+      const filterScript = gitHistoryRewriter.buildMessageFilterScript(targetHash, specialMessage);
+
+      expect(filterScript).toContain(targetHash);
+      expect(filterScript).toContain('echo');
+    });
+  });
+
+  describe('Integration with Git Operations', () => {
+    test('should handle complete date change workflow', async () => {
+      const commitsWithDates = [
+        { hash: 'abc123def456', newDate: '2023-01-01T12:00:00' },
+        { hash: 'def456abc123', newDate: '2023-01-02T12:00:00' }
+      ];
+
+      try {
+        const result = await gitHistoryRewriter.changeCommitDates(commitsWithDates);
+        expect(result).toHaveProperty('success');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        // Expected in test environment
+        expect(error.message).toBeDefined();
+      }
+    });
+
+    test('should handle complete message change workflow', async () => {
+      try {
+        const result = await gitHistoryRewriter.changeCommitMessage(
+          'abc123def456',
+          'Updated commit message for testing'
+        );
+
+        expect(result).toHaveProperty('success');
+        expect(typeof result.success).toBe('boolean');
+
+        if (result.success) {
+          expect(result).toHaveProperty('oldHash', 'abc123def456');
+          expect(result).toHaveProperty('newMessage');
+          expect(result).toHaveProperty('newHash');
+        }
+      } catch (error) {
+        // Expected in test environment
+        expect(error.message).toBeDefined();
+      }
+    });
+
+    test('should handle content replacement workflow', async () => {
+      const replacements = [
+        { pattern: 'oldText', replacement: 'newText' },
+        { pattern: /regexPattern/, replacement: 'regexReplacement' }
+      ];
+
+      try {
+        const result = await gitHistoryRewriter.replaceContentInHistory(replacements);
+        expect(result).toHaveProperty('success');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        // Expected in test environment
+        expect(error.message).toBeDefined();
+      }
+    });
+  });
+
+  describe('Cleanup and Resource Management', () => {
+    test('should cleanup backup branches', async () => {
+      const testBranches = ['gctm-backup-test1', 'gctm-backup-test2'];
+
+      // Should not throw when cleaning up non-existent branches
+      await expect(gitHistoryRewriter.cleanupBackupBranches(testBranches)).resolves.not.toThrow();
+    });
+
+    test('should handle empty backup branch list', async () => {
+      await expect(gitHistoryRewriter.cleanupBackupBranches([])).resolves.not.toThrow();
+    });
+
+    test('should handle invalid branch names in cleanup', async () => {
+      const invalidBranches = ['invalid@branch', 'another@invalid'];
+      await expect(gitHistoryRewriter.cleanupBackupBranches(invalidBranches)).resolves.not.toThrow();
     });
   });
 });

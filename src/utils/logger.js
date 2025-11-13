@@ -7,8 +7,8 @@ const path = require('path');
  */
 class Logger {
   constructor(options = {}) {
-    this.logLevel = options.logLevel || 'info';
-    this.enableFileLogging = options.enableFileLogging !== false;
+    this.level = options.level || 'info';
+    this.enableFileLogging = options.enableFileLogging === true;
     this.logFile = options.logFile || '.gctm-logs.txt';
 
     // Log levels
@@ -20,7 +20,7 @@ class Logger {
     };
 
     // Current level
-    this.currentLevel = this.levels[this.logLevel] || this.levels.info;
+    this.currentLevel = this.levels[this.level] || this.levels.info;
 
     // Create log file synchronously to avoid async in constructor
     if (this.enableFileLogging) {
@@ -130,7 +130,11 @@ class Logger {
 
     // Write to console
     const formattedMessage = this.formatMessage(level, message);
-    console.log(formattedMessage);
+    if (level === 'error') {
+      console.error(formattedMessage);
+    } else {
+      console.log(formattedMessage);
+    }
 
     // Write to file synchronously (prevents race conditions and data loss)
     this.writeToFileSync(level, message);
@@ -211,24 +215,47 @@ class Logger {
   list(items, title = 'List') {
     console.log(chalk.blue(`${title}:`));
 
-    items.forEach((item, index) => {
+    const itemList = Array.isArray(items) ? items : [items];
+
+    itemList.forEach((item, index) => {
       if (typeof item === 'string') {
         console.log(chalk.gray(`  ${index + 1}. ${item}`));
       } else {
-        console.log(chalk.gray(`  ${index + 1}. ${JSON.stringify(item, null, 2)}`));
+        try {
+          console.log(chalk.gray(`  ${index + 1}. ${JSON.stringify(item, null, 2)}`));
+        } catch (error) {
+          console.log(chalk.gray(`  ${index + 1}. [Object]`));
+        }
       }
     });
 
-    this.writeToFileSync('info', `${title}: ${JSON.stringify(items)}`);
+    try {
+      this.writeToFileSync('info', `${title}: ${JSON.stringify(items)}`);
+    } catch (error) {
+      this.writeToFileSync('info', `${title}: [Array of items]`);
+    }
   }
 
   /**
    * Progress indicator
+   * @param {string} message - Message
    * @param {number} current - Current value
    * @param {number} total - Total value
-   * @param {string} message - Message
    */
-  progress(current, total, message) {
+  progress(message, current, total) {
+    if (typeof message !== 'string') {
+      // Handle old parameter order (current, total, message)
+      total = current;
+      current = message;
+      message = 'Progress';
+    }
+
+    if (typeof total === 'undefined') {
+      console.log(`${chalk.blue('PROGRESS')} ${chalk.gray(message)}`);
+      this.writeToFileSync('info', `PROGRESS: ${message}`);
+      return;
+    }
+
     const percentage = Math.round((current / total) * 100);
     const barLength = 20;
     const filledLength = Math.round((percentage / 100) * barLength);
@@ -244,11 +271,10 @@ class Logger {
 
   /**
    * Table logging
-   * @param {Array} headers - Column headers
-   * @param {Array} rows - Rows
-   * @param {string} title - Table title
+   * @param {Object} tableData - Table data object with headers, rows, and optional title
    */
-  table(headers, rows, title = 'Table') {
+  table(tableData) {
+    const { headers = [], rows = [], title = 'Table' } = tableData;
     console.log(chalk.blue(title + ':'));
 
     // Write headers
@@ -260,7 +286,8 @@ class Logger {
     console.log(chalk.gray(separator));
 
     // Write rows
-    rows.forEach(row => {
+    const rowList = Array.isArray(rows) ? rows : [rows];
+    rowList.forEach(row => {
       const rowStr = Array.isArray(row) ? row.join(' | ') : JSON.stringify(row);
       console.log('  ' + rowStr);
     });
@@ -282,22 +309,22 @@ class Logger {
    * @param {string} level - New log level
    */
   setLevel(level) {
-    if (level in this.levels) {
-      this.logLevel = level;
+    if (level && level in this.levels) {
+      this.level = level;
       this.currentLevel = this.levels[level];
       this.info(`Log level changed to: ${level}`);
     }
+    // If invalid level, don't change anything (don't log this change)
   }
 
   /**
    * Clear log file
    */
-  async clearLogFile() {
+  clearLogFile() {
     if (!this.enableFileLogging) return;
 
     try {
-      await fs.remove(this.logFile);
-      await this.initializeLogFile();
+      fs.removeSync(this.logFile);
       this.info('Log file cleared');
     } catch (error) {
       this.warn('Could not clear log file: ' + error.message);
@@ -306,14 +333,14 @@ class Logger {
 
   /**
    * Gets log file content
-   * @returns {Promise<string>} Log file content
+   * @returns {string} Log file content
    */
-  async getLogFileContent() {
+  getLogFileContent() {
     if (!this.enableFileLogging) return '';
 
     try {
-      if (await fs.pathExists(this.logFile)) {
-        return await fs.readFile(this.logFile, 'utf8');
+      if (fs.pathExistsSync(this.logFile)) {
+        return fs.readFileSync(this.logFile, 'utf8');
       }
     } catch (error) {
       this.warn('Could not read log file: ' + error.message);
@@ -326,4 +353,6 @@ class Logger {
 // Default logger instance
 const logger = new Logger();
 
+// Export both the class and default instance
 module.exports = logger;
+module.exports.Logger = Logger;

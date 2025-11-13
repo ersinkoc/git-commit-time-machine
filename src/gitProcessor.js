@@ -469,39 +469,39 @@ class GitProcessor {
       };
     }
   }
-}
 
-/**
- * Force push to remote repository
- * @param {string} remote - Remote name (default: origin)
- * @param {string} branch - Branch name (default: current branch)
- * @returns {Promise<Object>} Operation result
- */
-async forcePush(remote = 'origin', branch = null) {
-  try {
-    const targetBranch = branch || (await this.getCurrentBranch());
+  /**
+   * Force push to remote repository
+   * @param {string} remote - Remote name (default: origin)
+   * @param {string} branch - Branch name (default: current branch)
+   * @returns {Promise<Object>} Operation result
+   */
+  async forcePush(remote = 'origin', branch = null) {
+    try {
+      const targetBranch = branch || (await this.getCurrentBranch());
 
-    logger.info(`Force pushing ${targetBranch} to ${remote}...`);
+      logger.info(`Force pushing ${targetBranch} to ${remote}...`);
 
-    const result = await this.git.push(remote, `${targetBranch}:${targetBranch}`, ['--force-with-lease']);
+      const result = await this.git.push(remote, `${targetBranch}:${targetBranch}`, ['--force-with-lease']);
 
-    logger.success(`Successfully force pushed to ${remote}/${targetBranch}`);
+      logger.success(`Successfully force pushed to ${remote}/${targetBranch}`);
 
-    return {
-      success: true,
-      remote,
-      branch: targetBranch,
-      pushed: true
-    };
+      return {
+        success: true,
+        remote,
+        branch: targetBranch,
+        pushed: true
+      };
 
-  } catch (error) {
-    logger.error(`Force push failed: ${error.message}`);
-    return {
-      success: false,
-      error: error.message,
-      remote,
-      branch: branch || (await this.getCurrentBranch())
-    };
+    } catch (error) {
+      logger.error(`Force push failed: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        remote,
+        branch: branch || (await this.getCurrentBranch())
+      };
+    }
   }
 }
 

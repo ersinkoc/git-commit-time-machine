@@ -29,6 +29,11 @@ class GitHistoryRewriter {
    * @returns {boolean} Whether branch name is valid
    */
   isValidBranchName(branchName) {
+    // Check for null, undefined, or non-string input
+    if (!branchName || typeof branchName !== 'string') {
+      return false;
+    }
+
     // Branch names can contain alphanumeric, dash, underscore, slash, and dot
     // but cannot start with dot, slash, or contain special shell characters
     return /^[a-zA-Z0-9_][\w-/.]*$/.test(branchName) &&
@@ -53,7 +58,16 @@ class GitHistoryRewriter {
       ...options
     });
 
+    // Handle timeout errors gracefully - return error result instead of throwing
     if (result.error) {
+      if (result.error.code === 'ETIMEDOUT') {
+        return {
+          stdout: '',
+          stderr: `Git command timed out after ${options.timeout || this.GIT_TIMEOUT}ms`,
+          status: 124 // Standard timeout exit code
+        };
+      }
+      // For other errors, still throw but ensure we have a proper result structure
       throw new Error(`Git command failed: ${result.error.message}`);
     }
 
@@ -534,15 +548,14 @@ esac
       }
     }
   }
-}
 
-/**
- * Change commit message using git filter-branch
- * @param {string} commitHash - Commit hash to change
- * @param {string} newMessage - New commit message
- * @returns {Promise<Object>} Operation result
- */
-async changeCommitMessage(commitHash, newMessage) {
+  /**
+   * Change commit message using git filter-branch
+   * @param {string} commitHash - Commit hash to change
+   * @param {string} newMessage - New commit message
+   * @returns {Promise<Object>} Operation result
+   */
+  async changeCommitMessage(commitHash, newMessage) {
   let backupBranch = null;
 
   try {
@@ -621,17 +634,17 @@ async changeCommitMessage(commitHash, newMessage) {
   }
 }
 
-/**
- * Build the message filter script for git filter-branch
- * @param {string} targetHash - Target commit hash
- * @param {string} newMessage - New commit message
- * @returns {string} Shell script for msg filter
- */
-buildMessageFilterScript(targetHash, newMessage) {
-  // Escape shell variables in the new message
-  const escapedMessage = newMessage.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"');
+  /**
+   * Build the message filter script for git filter-branch
+   * @param {string} targetHash - Target commit hash
+   * @param {string} newMessage - New commit message
+   * @returns {string} Shell script for msg filter
+   */
+  buildMessageFilterScript(targetHash, newMessage) {
+    // Escape shell variables in the new message
+    const escapedMessage = newMessage.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"');
 
-  return `#!/bin/sh
+    return `#!/bin/sh
 # Message filter for Git filter-branch
 if [ "$GIT_COMMIT" = "${targetHash}" ]; then
   echo '${escapedMessage}'
@@ -639,6 +652,7 @@ else
   cat
 fi
 `;
+  }
 }
 
 module.exports = GitHistoryRewriter;

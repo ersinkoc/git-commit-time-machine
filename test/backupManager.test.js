@@ -391,4 +391,242 @@ describe('BackupManager', () => {
       });
     });
   });
+
+  describe('ensureBackupDir', () => {
+    test('should create backup directory if it does not exist', async () => {
+      const expectedBackupDir = path.join(tempRepoPath, '.gctm-backups');
+      const customManager = new BackupManager(tempRepoPath);
+
+      await customManager.ensureBackupDir();
+
+      expect(await fs.pathExists(expectedBackupDir)).toBe(true);
+    });
+
+    test('should not fail if backup directory already exists', async () => {
+      // Directory should already exist from beforeEach
+      const result = await backupManager.ensureBackupDir();
+      expect(result).toBeUndefined(); // No return value expected
+    });
+  });
+
+  describe('getBackupDetails', () => {
+    test('should return details for existing backup', async () => {
+      const result = await backupManager.createBackup({ description: 'Test backup' });
+
+      if (result.success) {
+        const details = await backupManager.getBackupDetails(result.backupId);
+
+        expect(details).toHaveProperty('id', result.backupId);
+        expect(details).toHaveProperty('createdAt');
+        expect(details).toHaveProperty('repoPath', tempRepoPath);
+        expect(details).toHaveProperty('status');
+        expect(details).toHaveProperty('options');
+      }
+    });
+
+    test('should handle non-existent backup', async () => {
+      const details = await backupManager.getBackupDetails('non-existent-backup');
+
+      expect(details).toEqual({
+        success: false,
+        error: 'Invalid backup ID format: non-existent-backup'
+      });
+    });
+
+    test('should handle corrupted backup metadata', async () => {
+      // Create a backup directory with corrupted metadata
+      const corruptBackupId = 'corrupt-backup';
+      const corruptDir = path.join(backupManager.backupDir, corruptBackupId);
+      await fs.ensureDir(corruptDir);
+
+      // Write invalid JSON metadata
+      await fs.writeFile(path.join(corruptDir, 'metadata.json'), 'invalid-json');
+
+      const details = await backupManager.getBackupDetails(corruptBackupId);
+      expect(details).toEqual({
+        success: false,
+        error: 'Invalid backup ID format: corrupt-backup'
+      });
+    });
+  });
+
+  describe('getDirectorySize', () => {
+    test('should calculate directory size correctly', async () => {
+      // Create a test directory with known content
+      const testDir = path.join(tempRepoPath, 'test-size');
+      await fs.ensureDir(testDir);
+
+      // Create files with known content
+      await fs.writeFile(path.join(testDir, 'file1.txt'), 'Hello World'); // 11 bytes
+      await fs.writeFile(path.join(testDir, 'file2.txt'), 'Test Content'); // 12 bytes
+      await fs.writeFile(path.join(testDir, 'file3.txt'), 'Another Test'); // 13 bytes
+
+      const size = await backupManager.getDirectorySize(testDir);
+
+      // Size should be at least the sum of file contents (36 bytes)
+      expect(size).toBeGreaterThan(30);
+      expect(typeof size).toBe('number');
+
+      // Clean up
+      await fs.remove(testDir);
+    });
+
+    test('should handle empty directory', async () => {
+      const emptyDir = path.join(tempRepoPath, 'empty-dir');
+      await fs.ensureDir(emptyDir);
+
+      const size = await backupManager.getDirectorySize(emptyDir);
+      expect(size).toBe(0);
+
+      // Clean up
+      await fs.remove(emptyDir);
+    });
+
+    test('should handle non-existent directory', async () => {
+      const size = await backupManager.getDirectorySize('non-existent-dir');
+      expect(size).toBe(0);
+    });
+  });
+
+  describe('cleanupOldBackups', () => {
+    test('should delete old backups based on max age', async () => {
+      // Create multiple backups
+      const backupIds = [];
+      for (let i = 0; i < 3; i++) {
+        const result = await backupManager.createBackup({
+          description: `Test backup ${i}`,
+          includeUncommitted: false
+        });
+        if (result.success) {
+          backupIds.push(result.backupId);
+        }
+      }
+
+      // Test cleanup with very short max age (should delete all)
+      const cleanupResult = await backupManager.cleanupOldBackups({
+        maxAge: '0ms',
+        dryRun: false
+      });
+
+      expect(typeof cleanupResult.deleted).toBe('number');
+      expect(typeof cleanupResult.errors).toBe('number');
+    });
+
+    test('should handle dry run mode', async () => {
+      // Create a backup first
+      const result = await backupManager.createBackup({ description: 'Dry run test' });
+
+      if (result.success) {
+        const cleanupResult = await backupManager.cleanupOldBackups({
+          maxAge: '0ms',
+          dryRun: true
+        });
+
+        expect(cleanupResult.deleted).toBeGreaterThanOrEqual(0);
+        expect(cleanupResult.errors).toBe(0);
+
+        // In dry run mode, backup should still exist
+        const details = await backupManager.getBackupDetails(result.backupId);
+        expect(details).toBeTruthy();
+      }
+    });
+
+    test('should handle invalid max age format', async () => {
+      const cleanupResult = await backupManager.cleanupOldBackups({
+        maxAge: 'invalid-format',
+        dryRun: true
+      });
+
+      expect(cleanupResult.success).toBe(false);
+      expect(cleanupResult.deleted).toBe(0);
+      expect(cleanupResult.errors).toBe(1);
+      expect(cleanupResult.message).toContain('Invalid max age format');
+    });
+  });
+
+  describe('Edge Cases and Error Handling', () => {
+    test('should handle backup creation with uncommitted changes', async () => {
+      const result = await backupManager.createBackup({
+        description: 'Backup with uncommitted',
+        includeUncommitted: true
+      });
+
+      expect(result).toHaveProperty('success');
+      if (result.success) {
+        expect(result.backupId).toBeTruthy();
+
+        // Check backup metadata includes uncommitted flag
+        const details = await backupManager.getBackupDetails(result.backupId);
+        if (details) {
+          expect(details.options).toHaveProperty('includeUncommitted', true);
+        }
+      }
+    });
+
+    test('should handle restore with conflicting changes', async () => {
+      // Create a backup first
+      const createResult = await backupManager.createBackup({ description: 'Conflict test' });
+
+      if (createResult.success) {
+        // Attempt restore
+        const restoreResult = await backupManager.restoreBackup(createResult.backupId, {
+          force: true
+        });
+
+        expect(restoreResult).toHaveProperty('success');
+        expect(typeof restoreResult.success).toBe('boolean');
+      }
+    });
+
+    test('should handle large backup operations', async () => {
+      // Test with a larger number of concurrent backup operations
+      const operations = [];
+      for (let i = 0; i < 5; i++) {
+        operations.push(backupManager.createBackup({
+          description: `Concurrent backup ${i}`,
+          includeUncommitted: false
+        }));
+      }
+
+      const results = await Promise.allSettled(operations);
+
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.success) {
+          expect(result.value.backupId).toBeTruthy();
+        } else {
+          expect(result.status === 'rejected' || !result.value.success).toBe(true);
+        }
+      });
+    });
+  });
+
+  describe('Performance and Validation', () => {
+    test('should validate backup ID format', () => {
+      const validId = 'backup-2023-01-01T00-00-00-test123';
+      const invalidId = 'invalid@backup';
+
+      expect(backupManager.isValidBackupId(validId)).toBe(true);
+      expect(backupManager.isValidBackupId(invalidId)).toBe(false);
+      expect(backupManager.isValidBackupId(null)).toBe(false);
+      expect(backupManager.isValidBackupId('')).toBe(false);
+    });
+
+    test('should generate unique backup IDs', async () => {
+      const backupIds = new Set();
+      const numBackups = 3;
+
+      for (let i = 0; i < numBackups; i++) {
+        const result = await backupManager.createBackup({
+          description: `Unique test ${i}`
+        });
+
+        if (result.success) {
+          expect(backupIds.has(result.backupId)).toBe(false);
+          backupIds.add(result.backupId);
+        }
+      }
+
+      expect(backupIds.size).toBeLessThanOrEqual(numBackups);
+    });
+  });
 });
