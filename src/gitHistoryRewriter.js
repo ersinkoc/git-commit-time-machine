@@ -169,13 +169,12 @@ class GitHistoryRewriter {
    * @returns {string} Shell script for env filter
    */
   buildDateFilterScript(hashDateMap) {
-    // Convert mapping to shell case statement
+    // Convert mapping to shell case statement - use simple quotes for Windows compatibility
     const caseEntries = Object.entries(hashDateMap).map(([hash, date]) => {
-      // Escape shell variables - safer approach using printf
-      const safeDate = date.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"');
+      // Remove any problematic characters and use a safer approach
       return `  "${hash}")
-    export GIT_AUTHOR_DATE="${safeDate}"
-    export GIT_COMMITTER_DATE="${safeDate}"
+    GIT_AUTHOR_DATE='${date}'
+    GIT_COMMITTER_DATE='${date}'
     ;;`;
     });
 
