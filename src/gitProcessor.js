@@ -216,17 +216,35 @@ class GitProcessor {
           newMessage
         };
       } else {
-        // BUG-019 fix: Provide clear guidance for historical commit editing
-        logger.warn(`Changing message for historical commit ${commitHash} requires Git history rewrite`);
-        logger.info('Historical commit message editing is a destructive operation that rewrites Git history');
+        // For historical commits, use GitHistoryRewriter
+        logger.info(`Changing message for historical commit ${commitHash} using GitHistoryRewriter`);
 
-        return {
-          success: false,
-          hash: commitHash,
-          error: 'Changing historical commit messages requires interactive rebase. Use: git rebase -i <commit>^ and edit the commit, or use the GitHistoryRewriter class directly with caution. This operation rewrites history and may cause issues for shared repositories.',
-          requiresHistoryRewrite: true,
-          suggestion: `Run: git rebase -i ${commitHash}^ and change 'pick' to 'reword' for the target commit`
-        };
+        try {
+          const result = await this.historyRewriter.changeCommitMessage(commitHash, newMessage);
+
+          if (result.success) {
+            return {
+              success: true,
+              hash: commitHash,
+              newMessage,
+              newHash: result.newHash,
+              requiresForcePush: true
+            };
+          } else {
+            return {
+              success: false,
+              hash: commitHash,
+              error: result.error
+            };
+          }
+        } catch (historyError) {
+          logger.error(`Failed to rewrite commit message: ${historyError.message}`);
+          return {
+            success: false,
+            hash: commitHash,
+            error: `Failed to rewrite commit message: ${historyError.message}`
+          };
+        }
       }
     } catch (error) {
       logger.error(`Cannot change commit message: ${error.message}`);
@@ -450,6 +468,40 @@ class GitProcessor {
         error: error.message
       };
     }
+  }
+}
+
+/**
+ * Force push to remote repository
+ * @param {string} remote - Remote name (default: origin)
+ * @param {string} branch - Branch name (default: current branch)
+ * @returns {Promise<Object>} Operation result
+ */
+async forcePush(remote = 'origin', branch = null) {
+  try {
+    const targetBranch = branch || (await this.getCurrentBranch());
+
+    logger.info(`Force pushing ${targetBranch} to ${remote}...`);
+
+    const result = await this.git.push(remote, `${targetBranch}:${targetBranch}`, ['--force-with-lease']);
+
+    logger.success(`Successfully force pushed to ${remote}/${targetBranch}`);
+
+    return {
+      success: true,
+      remote,
+      branch: targetBranch,
+      pushed: true
+    };
+
+  } catch (error) {
+    logger.error(`Force push failed: ${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+      remote,
+      branch: branch || (await this.getCurrentBranch())
+    };
   }
 }
 

@@ -129,6 +129,18 @@ class GitCommitTimeMachine {
 
       if (result.success) {
         logger.info('Commit message successfully edited');
+
+        // If force push is requested, handle it
+        if (options.forcePush && result.requiresForcePush) {
+          logger.info('Force pushing changes to remote...');
+          try {
+            await this.gitProcessor.forcePush();
+            logger.success('Changes force pushed to remote');
+          } catch (pushError) {
+            logger.warn(`Force push failed: ${pushError.message}`);
+            result.forcePushError = pushError.message;
+          }
+        }
       } else {
         logger.error(`Failed to edit commit message: ${result.error}`);
       }

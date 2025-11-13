@@ -536,4 +536,109 @@ esac
   }
 }
 
+/**
+ * Change commit message using git filter-branch
+ * @param {string} commitHash - Commit hash to change
+ * @param {string} newMessage - New commit message
+ * @returns {Promise<Object>} Operation result
+ */
+async changeCommitMessage(commitHash, newMessage) {
+  let backupBranch = null;
+
+  try {
+    // Validate commit hash
+    if (!this.isValidHash(commitHash)) {
+      throw new Error(`Invalid commit hash: ${commitHash}`);
+    }
+
+    // Validate new message
+    if (!newMessage || newMessage.trim().length === 0) {
+      throw new Error(`Commit message cannot be empty`);
+    }
+
+    logger.info('Starting Git history rewrite for commit message change...');
+
+    // Create backup branch
+    backupBranch = await this.createBackupBranch();
+
+    try {
+      // Get current state
+      this.originalBranch = await this.getCurrentBranch();
+
+      // Build filter script for message change
+      const messageFilter = this.buildMessageFilterScript(commitHash, newMessage);
+
+      logger.info(`Changing message for commit: ${commitHash}`);
+
+      // Execute git filter-branch to change commit message
+      const filterResult = this.executeGitCommand([
+        'filter-branch',
+        '--msg-filter',
+        messageFilter,
+        '--force',
+        '--',
+        '--all'
+      ]);
+
+      if (filterResult.status !== 0) {
+        throw new Error(`Git filter-branch failed: ${filterResult.stderr}`);
+      }
+
+      // Get the new commit hash after rewrite
+      const newHashResult = this.executeGitCommand(['rev-parse', 'HEAD']);
+      if (newHashResult.status !== 0) {
+        logger.warn('Could not retrieve new commit hash');
+      }
+
+      const newHash = newHashResult.stdout.trim() || commitHash;
+
+      logger.success(`Successfully changed commit message`);
+
+      // Clean up backup branch after successful operation
+      await this.cleanupBackupBranches([backupBranch]);
+      logger.debug(`Cleaned up backup branch: ${backupBranch}`);
+
+      return {
+        success: true,
+        oldHash: commitHash,
+        newHash,
+        newMessage
+      };
+
+    } catch (error) {
+      // Restore from backup if something went wrong (keep backup on error)
+      await this.restoreFromBranch(backupBranch);
+      logger.info(`Backup branch ${backupBranch} preserved for recovery`);
+      throw error;
+    }
+
+  } catch (error) {
+    logger.error(`Failed to rewrite commit message: ${error.message}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Build the message filter script for git filter-branch
+ * @param {string} targetHash - Target commit hash
+ * @param {string} newMessage - New commit message
+ * @returns {string} Shell script for msg filter
+ */
+buildMessageFilterScript(targetHash, newMessage) {
+  // Escape shell variables in the new message
+  const escapedMessage = newMessage.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"');
+
+  return `#!/bin/sh
+# Message filter for Git filter-branch
+if [ "$GIT_COMMIT" = "${targetHash}" ]; then
+  echo '${escapedMessage}'
+else
+  cat
+fi
+`;
+}
+
 module.exports = GitHistoryRewriter;

@@ -135,6 +135,7 @@ program
   .option('-c, --commit <hash>', 'Commit hash to edit')
   .option('-m, --message <text>', 'New commit message')
   .option('-b, --backup', 'Create backup before operation')
+  .option('--force-push', 'Force push changes to remote after successful edit')
   .option('--interactive', 'Interactive mode')
   .action(async (options) => {
     try {
@@ -174,6 +175,12 @@ program
             name: 'createBackup',
             message: 'Create backup before operation?',
             default: true
+          },
+          {
+            type: 'confirm',
+            name: 'forcePush',
+            message: 'Force push changes to remote after successful edit?',
+            default: false
           }
         ]);
 
@@ -192,7 +199,8 @@ program
         editOptions = {
           commitId: options.commit,
           newMessage: options.message,
-          createBackup: options.backup !== false
+          createBackup: options.backup !== false,
+          forcePush: options.forcePush || false
         };
       }
 
