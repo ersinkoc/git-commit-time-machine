@@ -171,9 +171,12 @@ class GitHistoryRewriter {
   buildDateFilterScript(hashDateMap) {
     // Convert mapping to shell case statement
     const caseEntries = Object.entries(hashDateMap).map(([hash, date]) => {
-      // Escape shell variables and ensure proper quoting
-      const escapedDate = date.replace(/'/g, "'\"'\"'");
-      return `  "${hash}") export GIT_AUTHOR_DATE='${escapedDate}'; export GIT_COMMITTER_DATE='${escapedDate}'; ;;`;
+      // Escape shell variables - safer approach using printf
+      const safeDate = date.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"');
+      return `  "${hash}")
+    export GIT_AUTHOR_DATE="${safeDate}"
+    export GIT_COMMITTER_DATE="${safeDate}"
+    ;;`;
     });
 
     return `
@@ -641,13 +644,13 @@ esac
    * @returns {string} Shell script for msg filter
    */
   buildMessageFilterScript(targetHash, newMessage) {
-    // Escape shell variables in the new message
-    const escapedMessage = newMessage.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"');
+    // Escape shell variables in the new message safely
+    const escapedMessage = newMessage.replace(/'/g, "'\"'\"'").replace(/"/g, '\\"').replace(/\$/g, '\\$');
 
     return `#!/bin/sh
 # Message filter for Git filter-branch
 if [ "$GIT_COMMIT" = "${targetHash}" ]; then
-  echo '${escapedMessage}'
+  printf '%s\\n' "${escapedMessage}"
 else
   cat
 fi
