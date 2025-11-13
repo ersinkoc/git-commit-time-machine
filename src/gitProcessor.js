@@ -105,6 +105,20 @@ class GitProcessor {
   }
 
   /**
+   * Gets the current branch name
+   * @returns {Promise<string>} Current branch name
+   */
+  async getCurrentBranch() {
+    try {
+      const status = await this.git.status();
+      return status.current || 'main';
+    } catch (error) {
+      logger.error(`Cannot get current branch: ${error.message}`);
+      throw new Error(`Cannot get current branch: ${error.message}`);
+    }
+  }
+
+  /**
    * Gets file list for a specific commit
    * @param {string} commitHash - Commit hash
    * @returns {Promise<Array>} List of changed files
