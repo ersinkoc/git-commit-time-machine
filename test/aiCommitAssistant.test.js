@@ -11,16 +11,39 @@ const os = require('os');
 describe('AICommitAssistant', () => {
   let aiAssistant;
   let tempConfigPath;
+  // Store original environment variables
+  let originalEnv;
 
   beforeEach(async () => {
     // Create temporary directory for test config files
     tempConfigPath = await fs.mkdtemp(path.join(os.tmpdir(), 'gctm-ai-test-'));
+    // Save and clear environment variables to ensure clean test state
+    originalEnv = {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+      AI_API_KEY: process.env.AI_API_KEY,
+      OLLAMA_URL: process.env.OLLAMA_URL
+    };
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.AI_API_KEY;
+    delete process.env.OLLAMA_URL;
   });
 
   afterEach(async () => {
     // Clean up temp directory
     if (tempConfigPath) {
       await fs.remove(tempConfigPath);
+    }
+    // Restore original environment variables
+    if (originalEnv) {
+      Object.keys(originalEnv).forEach(key => {
+        if (originalEnv[key] !== undefined) {
+          process.env[key] = originalEnv[key];
+        }
+      });
     }
   });
 
@@ -31,8 +54,9 @@ describe('AICommitAssistant', () => {
         throwOnValidationError: false
       });
 
-      expect(aiAssistant.apiProvider).toBe('openai');
-      expect(aiAssistant.model).toBe('gpt-4-turbo');
+      // BUG-029: When no API key is set, provider defaults to 'local'
+      expect(aiAssistant.apiProvider).toBe('local');
+      expect(aiAssistant.model).toBe('llama3.3:70b'); // Default model for local provider
       expect(aiAssistant.maxTokens).toBe(150);
       expect(aiAssistant.temperature).toBe(0.7);
       expect(aiAssistant.language).toBe('en');

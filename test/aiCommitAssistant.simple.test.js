@@ -10,8 +10,24 @@ const path = require('path');
 describe('AICommitAssistant', () => {
   let aiAssistant;
   let tempConfigPath;
+  // Store original environment variables
+  let originalEnv;
 
   beforeEach(async () => {
+    // Save and clear environment variables to ensure clean test state
+    originalEnv = {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+      AI_API_KEY: process.env.AI_API_KEY,
+      OLLAMA_URL: process.env.OLLAMA_URL
+    };
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.AI_API_KEY;
+    delete process.env.OLLAMA_URL;
+
     tempConfigPath = path.join(__dirname, 'test-config.json');
     aiAssistant = new AICommitAssistant({
       strictValidation: false,
@@ -25,12 +41,21 @@ describe('AICommitAssistant', () => {
     if (await fs.pathExists(tempConfigPath)) {
       await fs.remove(tempConfigPath);
     }
+    // Restore original environment variables
+    if (originalEnv) {
+      Object.keys(originalEnv).forEach(key => {
+        if (originalEnv[key] !== undefined) {
+          process.env[key] = originalEnv[key];
+        }
+      });
+    }
   });
 
   describe('Constructor and Basic Setup', () => {
     test('should create instance with default values', () => {
-      expect(aiAssistant.apiProvider).toBe('openai');
-      expect(aiAssistant.model).toBe('gpt-4-turbo');
+      // BUG-029: When no API key is set, provider defaults to 'local'
+      expect(aiAssistant.apiProvider).toBe('local');
+      expect(aiAssistant.model).toBe('llama3.3:70b'); // Default model for local provider
       expect(aiAssistant.maxTokens).toBe(150);
       expect(aiAssistant.temperature).toBe(0.7);
       expect(aiAssistant.language).toBe('en');
@@ -120,10 +145,11 @@ describe('AICommitAssistant', () => {
         aiAssistant.validateModelForProvider();
       }).not.toThrow(); // Default model should be valid
 
-      // Test with invalid model in strict mode - but don't test it directly since it throws in constructor
+      // Test with valid OpenAI model and API key in strict mode
       const strictAssistant = new AICommitAssistant({
         apiKey: 'sk-1234567890123456789012345678901234567890', // Valid API key
-        model: 'gpt-4-turbo', // Use valid model to avoid constructor error
+        provider: 'openai', // Explicitly set provider
+        model: 'gpt-4-turbo', // Use valid OpenAI model
         strictValidation: true,
         throwOnValidationError: true
       });
@@ -228,7 +254,13 @@ describe('AICommitAssistant', () => {
       expect(config).toHaveProperty('apiKey');
       expect(config).toHaveProperty('apiProvider');
       expect(config).toHaveProperty('model');
-      expect(config.apiKey).toBe('***'); // Should be masked
+      // BUG-029: When no API key is set (local provider), apiKey will be null or undefined
+      // Only mask if there's actually an API key
+      if (aiAssistant.apiKey) {
+        expect(config.apiKey).toBe('***'); // Should be masked when present
+      } else {
+        expect(config.apiKey).toBeNull(); // No API key for local provider
+      }
     });
   });
 
@@ -391,8 +423,9 @@ chore: update dependencies`;
       const config = aiAssistant.getConfig();
 
       expect(config).toHaveProperty('apiKey');
-      expect(config).toHaveProperty('apiProvider', 'openai');
-      expect(config).toHaveProperty('model', 'gpt-4-turbo');
+      // BUG-029: When no API key is set, provider defaults to 'local'
+      expect(config).toHaveProperty('apiProvider', 'local');
+      expect(config).toHaveProperty('model', 'llama3.3:70b');
       expect(config).toHaveProperty('maxTokens', 150);
       expect(config).toHaveProperty('temperature', 0.7);
       expect(config).toHaveProperty('language', 'en');
