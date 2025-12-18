@@ -8,9 +8,12 @@ const logger = require('./utils/logger');
  */
 class AICommitAssistant {
   constructor(options = {}) {
-    this.apiKey = options.apiKey || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GOOGLE_API_KEY || process.env.AI_API_KEY;
-    this.apiProvider = options.provider || 'openai'; // openai, anthropic, google, local
-    this.model = options.model || this.getDefaultModel(options.provider || 'openai');
+    // BUG-029 fix: Auto-detect provider from environment variables if not specified
+    const detectedProvider = options.provider || this.detectProviderFromEnv();
+    
+    this.apiKey = options.apiKey || this.getApiKeyForProvider(detectedProvider);
+    this.apiProvider = detectedProvider;
+    this.model = options.model || this.getDefaultModel(detectedProvider);
     this.maxTokens = options.maxTokens || 150;
     this.temperature = options.temperature || 0.7;
     this.language = options.language || 'en'; // en, tr, es, fr, de, etc.
@@ -40,6 +43,46 @@ class AICommitAssistant {
         throw error;
       }
       logger.warn(`AI Assistant validation warning: ${error.message}`);
+    }
+  }
+
+  /**
+   * BUG-029 fix: Detect API provider from environment variables
+   * @returns {string} Detected provider name
+   */
+  detectProviderFromEnv() {
+    // Check environment variables in order of priority
+    if (process.env.OPENAI_API_KEY) return 'openai';
+    if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
+    if (process.env.GOOGLE_API_KEY) return 'google';
+    if (process.env.OLLAMA_URL || process.env.OLLAMA_HOST) return 'local';
+    if (process.env.AI_API_KEY) {
+      // Try to detect provider from AI_API_KEY format
+      const key = process.env.AI_API_KEY;
+      if (key.startsWith('sk-ant-')) return 'anthropic';
+      if (key.startsWith('sk-')) return 'openai';
+      if (key.startsWith('AIza')) return 'google';
+    }
+    return 'local'; // Default to local (no API key required)
+  }
+
+  /**
+   * BUG-029 fix: Get API key for specific provider
+   * @param {string} provider - API provider
+   * @returns {string|undefined} API key for the provider
+   */
+  getApiKeyForProvider(provider) {
+    switch (provider) {
+      case 'openai':
+        return process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+      case 'anthropic':
+        return process.env.ANTHROPIC_API_KEY || process.env.AI_API_KEY;
+      case 'google':
+        return process.env.GOOGLE_API_KEY || process.env.AI_API_KEY;
+      case 'local':
+        return undefined; // Local doesn't need API key
+      default:
+        return process.env.AI_API_KEY;
     }
   }
 
