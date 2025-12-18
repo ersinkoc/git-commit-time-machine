@@ -15,8 +15,22 @@ class GitCommitTimeMachine {
     this.dateManager = new DateManager();
     this.contentEditor = new ContentEditor(this.repoPath);
     this.backupManager = new BackupManager(this.repoPath);
-    this.aiAssistant = new AICommitAssistant(options.ai || {});
+    // BUG-029 fix: Lazy initialization of AI assistant to prevent validation errors
+    // when AI features are not being used
+    this._aiAssistant = null;
+    this._aiOptions = options.ai || {};
     this.options = options;
+  }
+
+  /**
+   * BUG-029 fix: Lazy getter for AI assistant - only initialized when first accessed
+   * @returns {AICommitAssistant} AI assistant instance
+   */
+  get aiAssistant() {
+    if (!this._aiAssistant) {
+      this._aiAssistant = new AICommitAssistant(this._aiOptions);
+    }
+    return this._aiAssistant;
   }
 
   /**
